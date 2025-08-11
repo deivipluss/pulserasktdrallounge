@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Roulette from '@/app/components/Roulette';
@@ -16,7 +16,15 @@ enum PageState {
   ERROR
 }
 
-export default function Play() {
+export default function PlayWrapper() {
+  return (
+    <Suspense fallback={<div>Cargando juego...</div>}>
+      <Play />
+    </Suspense>
+  );
+}
+
+function Play() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id') || '';
   
