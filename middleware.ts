@@ -10,6 +10,29 @@ export function middleware(request: NextRequest) {
   try {
     const { pathname, searchParams } = request.nextUrl;
 
+    // Endpoint de diagnóstico: /__mw-dbg
+    // No expone valores sensibles, solo estado general
+    const nodeEnv = process.env.NODE_ENV;
+    const host = request.headers.get('host') || '';
+    const isDev = (nodeEnv && nodeEnv !== 'production') || host.includes('localhost') || host.includes('127.0.0.1');
+    if (pathname === '/__mw-dbg') {
+      const debugPayload = {
+        nodeEnv: nodeEnv || 'undefined',
+        host,
+        isDev,
+        pathname,
+        adminRoute: ADMIN_ROUTES.some((r) => pathname === r),
+        protectedRoute: PROTECTED_ROUTES.some((r) => pathname.startsWith(r)),
+        hasId: searchParams.has('id'),
+        hasSig: searchParams.has('sig'),
+        hasAdminToken: searchParams.has('token'),
+      };
+      return new Response(JSON.stringify(debugPayload, null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+
     // Saltar rápidamente si no es ruta de app relevante
     // (el matcher también limita, pero mantenemos esta guarda)
     if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/robots') || pathname.startsWith('/sitemap')) {
@@ -22,7 +45,9 @@ export function middleware(request: NextRequest) {
       // En Edge Middleware solo NEXT_PUBLIC_* está garantizado
       const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin-token-2025';
       if (!token || token !== ADMIN_TOKEN) {
-        return NextResponse.redirect(new URL('/', request.url));
+        const res = NextResponse.redirect(new URL('/', request.url));
+        res.headers.set('x-mw', 'redir:admin-deny');
+        return res;
       }
       return NextResponse.next();
     }
@@ -32,17 +57,14 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Detectar entorno dev de forma segura
-    const nodeEnv = process.env.NODE_ENV;
-    const host = request.headers.get('host') || '';
-    const isDev = (nodeEnv && nodeEnv !== 'production') || host.includes('localhost') || host.includes('127.0.0.1');
-
     const id = searchParams.get('id');
     const sig = searchParams.get('sig');
 
     // Si faltan parámetros, redirigir
     if (!id || !sig) {
-      return NextResponse.redirect(new URL('/', request.url));
+      const res = NextResponse.redirect(new URL('/', request.url));
+      res.headers.set('x-mw', 'redir:missing-params');
+      return res;
     }
 
     // En desarrollo, permitir pasar para facilitar pruebas
@@ -56,9 +78,11 @@ export function middleware(request: NextRequest) {
     verifyUrl.searchParams.set('sig', sig);
     verifyUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
 
-    return NextResponse.redirect(verifyUrl);
+    const res = NextResponse.redirect(verifyUrl);
+    res.headers.set('x-mw', 'redir:verify');
+    return res;
   } catch (err) {
-    // Nunca tirar el sitio en Edge: continuar la request y adjuntar header para depurar
+    console.error('Edge middleware error:', err);
     const res = NextResponse.next();
     res.headers.set('x-mw-error', '1');
     return res;
