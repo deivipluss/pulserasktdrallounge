@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -71,7 +71,15 @@ const PRIZE_ALIASES: Record<string, PrizeKey> = {
   chupetines: 'chupetines',
 };
 
-export default function StatusPage() {
+export default function StatusPageWrapper() {
+  return (
+    <Suspense fallback={<div>Cargando panel...</div>}>
+      <StatusPage />
+    </Suspense>
+  );
+}
+
+function StatusPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   
