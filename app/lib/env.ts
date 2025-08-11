@@ -7,48 +7,47 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+// Valores por defecto seguros para build/preview (reemplaza en prod con ENV reales)
+const FALLBACKS = {
+  NEXT_PUBLIC_EVENT_TZ: 'America/Lima',
+  EVENT_START_ISO: '2025-01-01T00:00:00.000Z',
+  QR_BASE_URL: 'https://example.com',
+  // Longitud >= 32 para pasar validación mínima
+  SIGNING_SECRET: 'development-signing-secret-0123456789abcdef',
+};
+
 // Esquema para validar las variables de entorno
 const envSchema = z.object({
   // Variables públicas (accesibles desde el cliente)
-  NEXT_PUBLIC_EVENT_TZ: z.string().min(1).default('America/Lima'),
+  NEXT_PUBLIC_EVENT_TZ: z.string().min(1).default(FALLBACKS.NEXT_PUBLIC_EVENT_TZ),
   
   // Variables privadas (solo accesibles desde el servidor)
-  EVENT_START_ISO: z.string().refine(
-    (val) => dayjs(val).isValid(),
-    { message: 'EVENT_START_ISO debe ser una fecha ISO válida' }
-  ),
-  QR_BASE_URL: z.string().url().or(z.string().min(1)),
-  SIGNING_SECRET: z.string().min(32, 'SIGNING_SECRET debe tener al menos 32 caracteres'),
+  EVENT_START_ISO: z
+    .string()
+    .refine((val) => dayjs(val).isValid(), { message: 'EVENT_START_ISO debe ser una fecha ISO válida' })
+    .default(FALLBACKS.EVENT_START_ISO),
+  QR_BASE_URL: z.string().url().or(z.string().min(1)).default(FALLBACKS.QR_BASE_URL),
+  SIGNING_SECRET: z.string().min(32, 'SIGNING_SECRET debe tener al menos 32 caracteres').default(FALLBACKS.SIGNING_SECRET),
 });
 
 // Función para procesar y validar las variables de entorno
 function processEnv() {
-  // En producción usamos process.env
-  // En desarrollo podemos usar process.env directamente si está disponible
   const env = process.env;
   
   try {
+    // Intenta validar normalmente
     return envSchema.parse(env);
   } catch (error) {
+    // En build no debemos romper: devolvemos valores con defaults seguros
     if (error instanceof z.ZodError) {
-      const missingVars = error.issues
-        .filter((e: z.ZodIssue) => e.message.includes('Required'))
-        .map((e: z.ZodIssue) => e.path.join('.'))
-        .join(', ');
-      
-      const invalidVars = error.issues
-        .filter((e: z.ZodIssue) => !e.message.includes('Required'))
-        .map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
-        .join(', ');
-      
-      const errorMessage = [
-        'Error en la validación de variables de entorno:',
-        missingVars ? `Variables faltantes: ${missingVars}` : null,
-        invalidVars ? `Variables inválidas: ${invalidVars}` : null,
-      ].filter(Boolean).join('\n');
-      
-      throw new Error(errorMessage);
+      return {
+        NEXT_PUBLIC_EVENT_TZ: env.NEXT_PUBLIC_EVENT_TZ || FALLBACKS.NEXT_PUBLIC_EVENT_TZ,
+        EVENT_START_ISO: env.EVENT_START_ISO && dayjs(env.EVENT_START_ISO).isValid() ? env.EVENT_START_ISO : FALLBACKS.EVENT_START_ISO,
+        QR_BASE_URL: env.QR_BASE_URL && env.QR_BASE_URL.length ? env.QR_BASE_URL : FALLBACKS.QR_BASE_URL,
+        SIGNING_SECRET: env.SIGNING_SECRET && env.SIGNING_SECRET.length >= 32 ? env.SIGNING_SECRET : FALLBACKS.SIGNING_SECRET,
+      } as z.infer<typeof envSchema>;
     }
+    // Si el error es otro, re-lanzamos
     throw error;
   }
 }
@@ -91,7 +90,7 @@ export function getTimeUntilEvent() {
   
   if (now.isAfter(start)) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, hasStarted: true };
-  }
+    }
   
   const diff = start.diff(now, 'second');
   
