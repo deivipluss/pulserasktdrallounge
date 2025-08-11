@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Dropzone, { DropzoneOptions, FileRejection } from 'react-dropzone';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
@@ -24,11 +24,11 @@ const WRISTBAND = {
   WIDTH_PX: 2413,  // Ancho total de la pulsera en píxeles (del pantallazo)
   HEIGHT_PX: 398,  // Alto de la pulsera en píxeles (del pantallazo)
   QR_AREA: {
-    OFFSET_LEFT_PX: 1758, // Posición del centro del área blanca (ajustado según imagen)
-    WIDTH_PX: 200,       // Ancho del área del QR completo con fondo blanco
-    HEIGHT_PX: 200,      // Alto del área del QR completo con fondo blanco
-    QR_SIZE_PX: 80,      // Tamaño del código QR dentro del área blanca
-    ID_OFFSET_Y: 145,    // Posición Y donde va el texto ID-1234
+    OFFSET_LEFT_PX: 1538, // Posición exacta desde la izquierda según el segundo pantallazo
+    WIDTH_PX: 76,        // Ancho exacto del área del QR según el segundo pantallazo
+    HEIGHT_PX: 76,       // Alto exacto del área del QR según el segundo pantallazo
+    QR_SIZE_PX: 76,      // QR del mismo tamaño que el área para ocupar todo el espacio disponible (sin margen)
+    ID_OFFSET_Y: 86.1,   // Posición Y donde va el texto ID-1234 (justo debajo del QR)
   },
   // Mantenemos las medidas en MM para compatibilidad
   WIDTH_MM: 204.3,
@@ -40,14 +40,14 @@ const DEFAULT_PRESET = {
   dpi: 600, // DPI para la impresión
   qrArea: {
     // Valores exactos según la imagen proporcionada
-    x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX - (WRISTBAND.QR_AREA.WIDTH_PX / 2), // Centro X - mitad del ancho
-    y: 100, // Posición Y desde el top para que se vea bien centrado
+    x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX, 
+    y: 100, // Posición Y desde arriba para centrar verticalmente
     w: WRISTBAND.QR_AREA.WIDTH_PX, 
     h: WRISTBAND.QR_AREA.HEIGHT_PX, 
     rotation: 0
   },
-  qrSizePx: WRISTBAND.QR_AREA.QR_SIZE_PX, // Tamaño exacto del QR según imagen
-  idLabel: { enabled: true, dy: 130, fontPx: 28, align: 'center' } // Ajustado para que quede por debajo del QR
+  qrSizePx: WRISTBAND.QR_AREA.WIDTH_PX - 4, // Tamaño QR en píxeles, con margen mínimo
+  idLabel: { enabled: true, dy: 130, fontPx: 28, align: 'center' }, // Ajustado según imagen para que quede por debajo del QR
 };
 
 // Utilidades de conversión y detección DPI
@@ -190,44 +190,51 @@ export default function ImprimirPulserasPage() {
     ctx.clearRect(0, 0, templateImg.width, templateImg.height);
     ctx.drawImage(templateImg, 0, 0);
     
-    const { x, y, w, h } = preset.qrArea;
+    // Calcular la escala proporcional
+    const escala = templateImg.width / WRISTBAND.WIDTH_PX;
     
-    // Tamaño exacto del QR según imagen
-    const qrMargin = 0; // Sin margen adicional
-    const qrPx = WRISTBAND.QR_AREA.QR_SIZE_PX * (templateImg.width / WRISTBAND.WIDTH_PX); // Escala proporcional
+    // Aplicar escala a las dimensiones
+    const areaX = WRISTBAND.QR_AREA.OFFSET_LEFT_PX * escala;
+    const areaY = 100 * escala; // Posición Y ajustada para que se vea bien
+    const areaW = WRISTBAND.QR_AREA.WIDTH_PX * escala;
+    const areaH = WRISTBAND.QR_AREA.HEIGHT_PX * escala;
     
-    // Dibuja un área blanca para el QR
+    // Tamaño del QR para que ocupe casi todo el área blanca
+    const qrMargin = 0; // Sin margen adicional para maximizar tamaño
+    const qrPx = WRISTBAND.QR_AREA.QR_SIZE_PX * escala;
+    
+    // Dibuja un área blanca del tamaño exacto según referencia
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x, y, w, h); // Rectángulo blanco sin bordes redondeados
+    ctx.rect(areaX, areaY, areaW, areaH); // Rectángulo blanco exacto según referencia
     ctx.closePath();
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.restore();
     
     // Genera QR con alto nivel de corrección de errores
-    const qrOpts = { errorCorrectionLevel: 'H' as const, margin: qrMargin, width: qrPx };
+    const qrOpts = { errorCorrectionLevel: 'M' as const, margin: qrMargin, width: qrPx };
     const qrUrl: string = await QRCode.toDataURL(qrData, qrOpts);
     const qrImg = new window.Image();
     
     qrImg.onload = () => {
-      // Centra el QR en el área blanca según la imagen
-      const cx = x + (w - qrPx) / 2;
-      const cy = y + (h - qrPx) / 3; // Más arriba para dejar espacio para el ID
+      // Centra perfectamente el QR en el área blanca
+      const cx = areaX + (areaW - qrPx) / 2;
+      const cy = areaY + (areaH - qrPx) / 2;
       ctx.drawImage(qrImg, cx, cy, qrPx, qrPx);
       
-      // Dibuja el ID debajo del QR
+      // Dibuja el ID debajo del área blanca
       if (preset.idLabel?.enabled) {
-        const fontPx = preset.idLabel.fontPx || 24;
+        const fontPx = Math.round(18 * escala); // Tamaño de fuente proporcional
         ctx.save();
         ctx.font = `bold ${fontPx}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#222222';
         
-        // Posición exacta del ID como se ve en la imagen
-        const labelX = x + w / 2; 
-        const labelY = y + h - fontPx - 10; // En la parte inferior del área blanca
+        // Posición del ID debajo del área blanca
+        const labelX = areaX + areaW / 2;
+        const labelY = areaY + areaH + 5;
         ctx.fillText(id, labelX, labelY);
         ctx.restore();
       }
