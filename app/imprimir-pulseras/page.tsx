@@ -7,7 +7,6 @@ import QRCode from 'qrcode';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { motion } from 'framer-motion';
 import { 
-  Upload, 
   FileDown, 
   QrCode, 
   PanelLeft, 
@@ -16,7 +15,8 @@ import {
   AlertCircle, 
   Check,
   Download,
-  FileImage
+  FileImage,
+  Upload
 } from 'lucide-react';
 
 // CONSTANTES DE LA PULSERA
@@ -295,8 +295,14 @@ export default function ImprimirPulserasPage() {
     for (let i = 0; i < rows.length; i++) {
       // Renderiza pulsera
       await renderPreview(rows[i].url, rows[i].id);
+      
+      // Importante: esperar a que el QR se renderice completamente
+      // La generación del QR es asíncrona pero no devuelve una promesa
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const canvas = canvasRef.current;
       if (!canvas) continue;
+      
       const pngBytes = await fetch(canvas.toDataURL('image/png')).then(r => r.arrayBuffer());
       const img = await pdfDoc.embedPng(pngBytes);
       const x = Number(col * cellW + bleedPx);
