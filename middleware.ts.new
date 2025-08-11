@@ -1,0 +1,47 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// Rutas que requieren validación de token
+const PROTECTED_ROUTES = ['/jugar'];
+
+export function middleware(request: NextRequest) {
+  // Comprobar si es una ruta protegida
+  const pathname = request.nextUrl.pathname;
+  if (!PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  // Verificar si estamos en modo desarrollo
+  const host = request.headers.get('host') || '';
+  const isDev = host.includes('localhost') || host.includes('127.0.0.1');
+  
+  // Obtener parámetros de consulta
+  const searchParams = request.nextUrl.searchParams;
+  const id = searchParams.get('id');
+  const sig = searchParams.get('sig');
+  
+  // Si falta algún parámetro, redirigir a la página principal o de prueba en desarrollo
+  if (!id || !sig) {
+    if (isDev) {
+      // En desarrollo, redirigir a la página de prueba de tokens
+      return NextResponse.redirect(new URL('/dev/test-tokens', request.url));
+    }
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // En desarrollo, simplemente permitir cualquier token para facilitar las pruebas
+  // En producción, la validación ocurriría en el servidor
+  if (isDev) {
+    return NextResponse.next();
+  }
+
+  // En producción, redirigiremos a la API de verificación
+  // Esta es una solución temporal hasta que migremos la validación de tokens
+  // fuera del Edge Runtime
+  const verifyUrl = new URL('/api/verify-token', request.url);
+  verifyUrl.searchParams.set('id', id);
+  verifyUrl.searchParams.set('sig', sig);
+  verifyUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
+  
+  return NextResponse.redirect(verifyUrl);
+}
