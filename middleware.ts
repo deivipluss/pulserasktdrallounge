@@ -14,9 +14,8 @@ export function middleware(request: NextRequest) {
   if (ADMIN_ROUTES.some(route => pathname === route)) {
     // Extraer token de administrador de la URL
     const token = request.nextUrl.searchParams.get('token');
-    
-    // Verificar si el token de administrador es válido (verificación simplificada)
-    const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin-token-2025';
+    // En Edge Middleware, solo se puede acceder a variables NEXT_PUBLIC_ (o usar fallback)
+    const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin-token-2025';
     if (!token || token !== ADMIN_TOKEN) {
       // Si no hay token o es inválido, redirigir a la página de inicio
       return NextResponse.redirect(new URL('/', request.url));
