@@ -5,6 +5,15 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/imprimir-pulseras',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
