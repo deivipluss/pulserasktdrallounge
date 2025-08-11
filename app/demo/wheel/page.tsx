@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import SpinController from '@/app/components/SpinController';
@@ -29,7 +29,15 @@ const dates = {
   future: '2025-12-31T00:00:00',  // Fecha en el futuro lejano
 };
 
-export default function WheelDemo() {
+export default function WheelDemoWrapper() {
+  return (
+    <Suspense fallback={<div>Cargando demo...</div>}>
+      <WheelDemo />
+    </Suspense>
+  );
+}
+
+function WheelDemo() {
   const searchParams = useSearchParams();
   const idParam = searchParams.get('id');
   
