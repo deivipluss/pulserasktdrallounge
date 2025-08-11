@@ -7,59 +7,68 @@ const PROTECTED_ROUTES = ['/jugar'];
 const ADMIN_ROUTES = ['/status'];
 
 export function middleware(request: NextRequest) {
-  // Comprobar si es una ruta protegida
-  const pathname = request.nextUrl.pathname;
-  
-  // Comprobar si es una ruta de administración
-  if (ADMIN_ROUTES.some(route => pathname === route)) {
-    // Extraer token de administrador de la URL
-    const token = request.nextUrl.searchParams.get('token');
-    // En Edge Middleware, solo se puede acceder a variables NEXT_PUBLIC_ (o usar fallback)
-    const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin-token-2025';
-    if (!token || token !== ADMIN_TOKEN) {
-      // Si no hay token o es inválido, redirigir a la página de inicio
+  try {
+    const { pathname, searchParams } = request.nextUrl;
+
+    // Saltar rápidamente si no es ruta de app relevante
+    // (el matcher también limita, pero mantenemos esta guarda)
+    if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/robots') || pathname.startsWith('/sitemap')) {
+      return NextResponse.next();
+    }
+
+    // Rutas de administración: validar token simple en query (?token=)
+    if (ADMIN_ROUTES.some(route => pathname === route)) {
+      const token = searchParams.get('token');
+      // En Edge Middleware solo NEXT_PUBLIC_* está garantizado
+      const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin-token-2025';
+      if (!token || token !== ADMIN_TOKEN) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+      return NextResponse.next();
+    }
+
+    // Si no es una ruta protegida, continuar
+    if (!PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+      return NextResponse.next();
+    }
+
+    // Detectar entorno dev de forma segura
+    const nodeEnv = process.env.NODE_ENV;
+    const host = request.headers.get('host') || '';
+    const isDev = (nodeEnv && nodeEnv !== 'production') || host.includes('localhost') || host.includes('127.0.0.1');
+
+    const id = searchParams.get('id');
+    const sig = searchParams.get('sig');
+
+    // Si faltan parámetros, redirigir
+    if (!id || !sig) {
       return NextResponse.redirect(new URL('/', request.url));
     }
-    
-    return NextResponse.next();
-  }
-  
-  // Para rutas de usuario normal que requieren validación de token
-  if (!PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
 
-  // Verificar si estamos en modo desarrollo
-  const host = request.headers.get('host') || '';
-  const isDev = host.includes('localhost') || host.includes('127.0.0.1');
-  
-  // Obtener parámetros de consulta
-  const searchParams = request.nextUrl.searchParams;
-  const id = searchParams.get('id');
-  const sig = searchParams.get('sig');
-  
-  // Si falta algún parámetro, redirigir a la página principal o de prueba en desarrollo
-  if (!id || !sig) {
+    // En desarrollo, permitir pasar para facilitar pruebas
     if (isDev) {
-      // En desarrollo, redirigir a la página de prueba de tokens
-      return NextResponse.redirect(new URL('/dev/test-tokens', request.url));
+      return NextResponse.next();
     }
-    return NextResponse.redirect(new URL('/', request.url));
-  }
 
-  // En desarrollo, simplemente permitir cualquier token para facilitar las pruebas
-  // En producción, la validación ocurriría en el servidor
-  if (isDev) {
-    return NextResponse.next();
-  }
+    // En producción, redirigir a API de verificación (Node runtime)
+    const verifyUrl = new URL('/api/verify-token', request.url);
+    verifyUrl.searchParams.set('id', id);
+    verifyUrl.searchParams.set('sig', sig);
+    verifyUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
 
-  // En producción, redirigiremos a la API de verificación
-  // Esta es una solución temporal hasta que migremos la validación de tokens
-  // fuera del Edge Runtime
-  const verifyUrl = new URL('/api/verify-token', request.url);
-  verifyUrl.searchParams.set('id', id);
-  verifyUrl.searchParams.set('sig', sig);
-  verifyUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
-  
-  return NextResponse.redirect(verifyUrl);
+    return NextResponse.redirect(verifyUrl);
+  } catch (err) {
+    // Nunca tirar el sitio en Edge: continuar la request y adjuntar header para depurar
+    const res = NextResponse.next();
+    res.headers.set('x-mw-error', '1');
+    return res;
+  }
 }
+
+// Limitar el alcance del middleware para evitar invocaciones en estáticos y APIs
+export const config = {
+  matcher: [
+    // Todas las rutas excepto API y assets comunes
+    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)',
+  ],
+};
