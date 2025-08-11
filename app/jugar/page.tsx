@@ -35,6 +35,11 @@ function Play() {
   // Verificar el estado al cargar
   useEffect(() => {
     const checkState = async () => {
+      if (!id) {
+        setState(PageState.ERROR);
+        return;
+      }
+      
       // 1. Verificar si ya jugó
       if (hasIdPlayed(id)) {
         setState(PageState.PLAYED);
@@ -204,29 +209,48 @@ function Play() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">
                   <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
                   <path d="m15 9-6 6"></path>
                   <path d="m9 9 6 6"></path>
                 </svg>
               </div>
-              
-              <h2 className="text-fluid-2xl font-heading font-bold mb-2">
-                Ha ocurrido un error
-              </h2>
-              
-              <p className="text-fluid-base text-gray-600 dark:text-gray-300 mb-6">
-                No pudimos cargar el juego. Por favor, inténtalo de nuevo más tarde.
+              <h2 className="text-fluid-2xl font-heading font-bold">{id ? 'Ha ocurrido un error' : 'Falta parámetro id'}</h2>
+              <p className="text-fluid-base text-gray-600 dark:text-gray-300">
+                {id ? 'No pudimos cargar el juego. Intenta de nuevo.' : 'Necesitas acceder con un enlace QR válido que incluya id y sig.'}
               </p>
-              
-              <button 
-                onClick={() => window.location.reload()}
-                className="w-full py-3 px-6 bg-fiesta-blue text-white rounded-token font-medium text-center transition-all hover:bg-fiesta-blue/90"
-              >
-                Intentar de nuevo
-              </button>
+              {!id && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/generate-token');
+                      const data = await res.json();
+                      window.location.href = data.playUrl;
+                    } catch {
+                      alert('Error generando token demo');
+                    }
+                  }}
+                  className="w-full py-3 px-6 bg-fiesta-purple text-white rounded-token font-medium hover:bg-fiesta-purple/90"
+                >
+                  Generar token demo
+                </button>
+              )}
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="flex-1 py-3 px-6 bg-fiesta-blue text-white rounded-token font-medium text-center transition-all hover:bg-fiesta-blue/90"
+                >
+                  Reintentar
+                </button>
+                <button 
+                  onClick={() => window.location.href='/'}
+                  className="flex-1 py-3 px-6 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-token font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  Inicio
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
