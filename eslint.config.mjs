@@ -1,12 +1,8 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
+// Use the workspace root as base directory to avoid relying on __dirname in ESM
 const compat = new FlatCompat({
-  baseDirectory: __dirname,
+  baseDirectory: process.cwd(),
 });
 
 const eslintConfig = [
