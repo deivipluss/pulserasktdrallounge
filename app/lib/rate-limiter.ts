@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 // Una clase simple para gestionar rate limiting por IP
 export class RateLimiter {
