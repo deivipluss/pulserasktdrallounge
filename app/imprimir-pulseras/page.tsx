@@ -21,26 +21,33 @@ import {
 
 // CONSTANTES DE LA PULSERA
 const WRISTBAND = {
-  WIDTH_MM: 204.3, // Ancho total de la pulsera en mm
-  HEIGHT_MM: 33.69, // Alto de la pulsera en mm
+  WIDTH_PX: 2413,  // Ancho total de la pulsera en píxeles (del pantallazo)
+  HEIGHT_PX: 398,  // Alto de la pulsera en píxeles (del pantallazo)
   QR_AREA: {
-    OFFSET_LEFT_MM: 129.9, // Distancia desde el borde izquierdo hasta el área QR
-    WIDTH_MM: 54.4,        // Ancho del área del QR
-    HEIGHT_MM: 54.4,       // Alto del área del QR (aproximadamente)
-    TOP_MARGIN_MM: 6.3,    // Margen superior del QR
-    BOTTOM_MARGIN_MM: 7.1, // Margen inferior del QR
-  }
+    OFFSET_LEFT_PX: 1758, // Posición del centro del área blanca (ajustado según imagen)
+    WIDTH_PX: 200,       // Ancho del área del QR completo con fondo blanco
+    HEIGHT_PX: 200,      // Alto del área del QR completo con fondo blanco
+    QR_SIZE_PX: 80,      // Tamaño del código QR dentro del área blanca
+    ID_OFFSET_Y: 145,    // Posición Y donde va el texto ID-1234
+  },
+  // Mantenemos las medidas en MM para compatibilidad
+  WIDTH_MM: 204.3,
+  HEIGHT_MM: 33.69
 };
 
 // Preset de calibración por defecto, actualizado con las medidas exactas
 const DEFAULT_PRESET = {
   dpi: 600, // DPI para la impresión
   qrArea: {
-    // Los valores iniciales se reemplazarán dinámicamente al cargar la imagen
-    x: 1535, y: 88, w: 756, h: 756, rotation: 0
+    // Valores exactos según la imagen proporcionada
+    x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX - (WRISTBAND.QR_AREA.WIDTH_PX / 2), // Centro X - mitad del ancho
+    y: 100, // Posición Y desde el top para que se vea bien centrado
+    w: WRISTBAND.QR_AREA.WIDTH_PX, 
+    h: WRISTBAND.QR_AREA.HEIGHT_PX, 
+    rotation: 0
   },
-  qrSizeMm: WRISTBAND.QR_AREA.WIDTH_MM - 8, // Tamaño QR en mm, con margen
-  idLabel: { enabled: true, dy: 40, fontPx: 64, align: 'center' },
+  qrSizePx: WRISTBAND.QR_AREA.QR_SIZE_PX, // Tamaño exacto del QR según imagen
+  idLabel: { enabled: true, dy: 130, fontPx: 28, align: 'center' } // Ajustado para que quede por debajo del QR
 };
 
 // Utilidades de conversión y detección DPI
@@ -56,13 +63,20 @@ function pxToMm(px: number, dpi: number): number {
   return px * 25.4 / dpi;
 }
 
-// Calcula las coordenadas en px a partir de mm
-function calculateQrAreaPx(dpi: number) {
+// Calcula las coordenadas exactas del QR según la imagen real
+function calculateQrAreaPx(templateWidth: number) {
+  // Calculamos la escala entre la plantilla original y la cargada por el usuario
+  const escala = templateWidth / WRISTBAND.WIDTH_PX;
+  
+  // Calculamos la posición centrada del QR
+  const x = (WRISTBAND.QR_AREA.OFFSET_LEFT_PX - WRISTBAND.QR_AREA.WIDTH_PX / 2) * escala; // Posición izquierda del área
+  const y = 100 * escala; // Posición desde arriba ajustada para centrar verticalmente
+  
   return {
-    x: mmToPx(WRISTBAND.QR_AREA.OFFSET_LEFT_MM, dpi),
-    y: mmToPx(WRISTBAND.QR_AREA.TOP_MARGIN_MM, dpi),
-    w: mmToPx(WRISTBAND.QR_AREA.WIDTH_MM, dpi),
-    h: mmToPx(WRISTBAND.QR_AREA.HEIGHT_MM - WRISTBAND.QR_AREA.TOP_MARGIN_MM - WRISTBAND.QR_AREA.BOTTOM_MARGIN_MM, dpi),
+    x,
+    y,
+    w: WRISTBAND.QR_AREA.WIDTH_PX * escala,
+    h: WRISTBAND.QR_AREA.HEIGHT_PX * escala,
   };
 }
 
@@ -85,7 +99,7 @@ export default function ImprimirPulserasPage() {
   useEffect(() => {
     if (templateImg) {
       const dpi = detectDpiFromTemplate(templateImg.width);
-      const qrArea = calculateQrAreaPx(dpi);
+      const qrArea = calculateQrAreaPx(templateImg.width);
       
       setPreset(prev => ({
         ...prev,
@@ -178,24 +192,14 @@ export default function ImprimirPulserasPage() {
     
     const { x, y, w, h } = preset.qrArea;
     
-    // El QR debe ocupar el máximo posible dentro del área definida
-    // Deja margen para el quiet zone del QR
-    const qrMargin = 4;
-    const qrPx = Math.min(w, h) - 2 * qrMargin;
+    // Tamaño exacto del QR según imagen
+    const qrMargin = 0; // Sin margen adicional
+    const qrPx = WRISTBAND.QR_AREA.QR_SIZE_PX * (templateImg.width / WRISTBAND.WIDTH_PX); // Escala proporcional
     
-    // Dibuja un área blanca para el QR si la plantilla no la tiene
+    // Dibuja un área blanca para el QR
     ctx.save();
     ctx.beginPath();
-    const radius = 12; // Radio de las esquinas
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + w - radius, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
-    ctx.lineTo(x + w, y + h - radius);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-    ctx.lineTo(x + radius, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.rect(x, y, w, h); // Rectángulo blanco sin bordes redondeados
     ctx.closePath();
     ctx.fillStyle = '#ffffff';
     ctx.fill();
@@ -207,23 +211,23 @@ export default function ImprimirPulserasPage() {
     const qrImg = new window.Image();
     
     qrImg.onload = () => {
-      // Centra el QR en el área blanca
+      // Centra el QR en el área blanca según la imagen
       const cx = x + (w - qrPx) / 2;
-      const cy = y + (h - qrPx) / 2;
+      const cy = y + (h - qrPx) / 3; // Más arriba para dejar espacio para el ID
       ctx.drawImage(qrImg, cx, cy, qrPx, qrPx);
       
-      // Dibuja el ID si está habilitado
+      // Dibuja el ID debajo del QR
       if (preset.idLabel?.enabled) {
-        const fontPx = preset.idLabel.fontPx || 64;
+        const fontPx = preset.idLabel.fontPx || 24;
         ctx.save();
         ctx.font = `bold ${fontPx}px sans-serif`;
-        ctx.textAlign = (['left','right','center','start','end'].includes(preset.idLabel.align) ? preset.idLabel.align : 'center') as CanvasTextAlign;
+        ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#222222';
         
-        // Posición: debajo del QR, desplazamiento dy
-        const labelX = x + w / 2;
-        const labelY = cy + qrPx + (preset.idLabel.dy || 40);
+        // Posición exacta del ID como se ve en la imagen
+        const labelX = x + w / 2; 
+        const labelY = y + h - fontPx - 10; // En la parte inferior del área blanca
         ctx.fillText(id, labelX, labelY);
         ctx.restore();
       }
@@ -485,9 +489,9 @@ export default function ImprimirPulserasPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 text-gray-400">
                         <div>DPI: <span className="text-white">{detectDpiFromTemplate(templateImg.width).toFixed(2)}</span></div>
-                        <div>QR: <span className="text-white">{preset.qrSizeMm.toFixed(2)} mm</span></div>
-                        <div>Desde izq: <span className="text-white">{WRISTBAND.QR_AREA.OFFSET_LEFT_MM} mm</span></div>
-                        <div>Margen: <span className="text-white">{WRISTBAND.QR_AREA.TOP_MARGIN_MM} mm</span></div>
+                        <div>QR: <span className="text-white">{preset.qrSizePx}px</span></div>
+                        <div>Área QR X: <span className="text-white">{Math.round(preset.qrArea.x)}px</span></div>
+                        <div>Área QR Y: <span className="text-white">{Math.round(preset.qrArea.y)}px</span></div>
                       </div>
                     </div>
                   </div>
@@ -645,10 +649,10 @@ export default function ImprimirPulserasPage() {
                     <div>
                       <h3 className="text-gray-300 mb-2">Posición del QR</h3>
                       <div className="space-y-1 text-gray-400">
-                        <div>Distancia desde izquierda: <span className="text-white">{WRISTBAND.QR_AREA.OFFSET_LEFT_MM} mm</span></div>
-                        <div>Margen superior: <span className="text-white">{WRISTBAND.QR_AREA.TOP_MARGIN_MM} mm</span></div>
-                        <div>Margen inferior: <span className="text-white">{WRISTBAND.QR_AREA.BOTTOM_MARGIN_MM} mm</span></div>
-                        <div>Tamaño del QR: <span className="text-white">{preset.qrSizeMm.toFixed(2)} mm</span></div>
+                        <div>Distancia desde izquierda: <span className="text-white">{WRISTBAND.QR_AREA.OFFSET_LEFT_PX} px</span></div>
+                        <div>Posición X: <span className="text-white">{WRISTBAND.QR_AREA.OFFSET_LEFT_PX} px</span></div>
+                        <div>Tamaño área: <span className="text-white">{WRISTBAND.QR_AREA.WIDTH_PX}x{WRISTBAND.QR_AREA.HEIGHT_PX} px</span></div>
+                        <div>Tamaño del QR: <span className="text-white">{WRISTBAND.QR_AREA.QR_SIZE_PX} px</span></div>
                       </div>
                     </div>
                     
