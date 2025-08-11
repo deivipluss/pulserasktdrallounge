@@ -89,10 +89,11 @@ export function middleware(request: NextRequest) {
   }
 }
 
-// Limitar el alcance del middleware para evitar invocaciones en estáticos y APIs
+// Limitar el alcance del middleware solo a rutas necesarias
 export const config = {
   matcher: [
-    // Todas las rutas excepto API y assets comunes
-    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)',
+    '/status',
+    '/jugar/:path*',
+    '/__mw-dbg',
   ],
 };
