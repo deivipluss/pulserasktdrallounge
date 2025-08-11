@@ -10,6 +10,12 @@ export function middleware(request: NextRequest) {
   try {
     const { pathname, searchParams } = request.nextUrl;
 
+    // Fallback: si raíz y por alguna razón no existe, reescribe a landing (app/page)
+    if (pathname === '/') {
+      // No redirigimos a otra ruta; dejamos que pase para que sirva la página raíz
+      return NextResponse.next();
+    }
+
     // Endpoint de diagnóstico: /__mw-dbg
     // No expone valores sensibles, solo estado general
     const nodeEnv = process.env.NODE_ENV;

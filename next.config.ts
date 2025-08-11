@@ -5,15 +5,7 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/imprimir-pulseras',
-        permanent: false,
-      },
-    ];
-  },
+  // Se eliminan redirects para permitir la página raíz
 };
 
 export default nextConfig;
