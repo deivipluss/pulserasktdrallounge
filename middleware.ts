@@ -10,6 +10,11 @@ export function middleware(request: NextRequest) {
   try {
     const { pathname, searchParams } = request.nextUrl;
 
+    // Redirigir raíz explícitamente para evitar 404 si fallan redirects de build
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/imprimir-pulseras', request.url));
+    }
+
     // Endpoint de diagnóstico: /__mw-dbg
     // No expone valores sensibles, solo estado general
     const nodeEnv = process.env.NODE_ENV;
@@ -92,6 +97,7 @@ export function middleware(request: NextRequest) {
 // Limitar el alcance del middleware solo a rutas necesarias
 export const config = {
   matcher: [
+    '/',
     '/status',
     '/jugar/:path*',
     '/__mw-dbg',
