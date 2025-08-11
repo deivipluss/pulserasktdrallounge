@@ -39,7 +39,7 @@ export default function WheelDemoWrapper() {
 
 function WheelDemo() {
   const searchParams = useSearchParams();
-  const idParam = searchParams.get('id');
+  const idParam = searchParams?.get('id') || null;
   
   const [selectedPrize, setSelectedPrize] = useState<Prize | null>(null);
   const [demoMode, setDemoMode] = useState<'past' | 'soon' | 'future'>('past');
@@ -61,7 +61,7 @@ function WheelDemo() {
     
     // En un entorno real, verificaríamos la firma con la API
     if (idParam) {
-      const signature = searchParams.get('sig');
+      const signature = searchParams?.get('sig');
       // En producción: fetch('/api/verify?id=' + idParam + '&sig=' + signature)
     }
   }, [pulseraId, idParam, searchParams]);
