@@ -188,6 +188,34 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
     return target;
   };
 
+  // Función debug para forzar un índice específico (QA)
+  const forceSpin = (forceIndex: number) => {
+    if (spinning || disabled) return;
+    if (forceIndex < 0 || forceIndex >= data.length) return;
+    
+    setSpinning(true);
+    const target = getTargetRotation(forceIndex);
+    lastTarget.current = target;
+    setRotation(target);
+    
+    window.setTimeout(() => {
+      setSpinning(false);
+      // Efectos V1
+      try { if ('vibrate' in navigator) (navigator as any).vibrate?.(70); } catch {}
+      const reward = data[forceIndex];
+      if (reward.sparkle) launchConfetti();
+      onResult?.(reward, forceIndex);
+      
+      console.log(`[DEBUG] Forzado premio: ${reward.name} (índice ${forceIndex})`);
+    }, durationMs);
+  };
+
+  // Exponer forceSpin para depuración
+  React.useEffect(() => {
+    (window as any).__rouletteForceSpin = (idx: number) => forceSpin(idx);
+    return () => { delete (window as any).__rouletteForceSpin; };
+  }, [data, durationMs, spinning, disabled]);
+
   // Spin usando la selección ponderada de V1
   const spin = () => {
     if (spinning || disabled) return;
