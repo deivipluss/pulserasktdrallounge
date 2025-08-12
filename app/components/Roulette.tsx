@@ -177,7 +177,7 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
     return `conic-gradient(from 0deg, ${stops.join(', ')})`;
   }, [n, segment, data]);
 
-  // Líneas divisorias
+  // Líneas divisorias - seguimos el mismo orden del gradiente
   const dividers = useMemo(() => Array.from({ length: n }).map((_, i) => i * segment), [n, segment]);
 
   // Ángulo objetivo para que el CENTRO del sector quede en el puntero (12h)
@@ -242,15 +242,16 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
         const finalRot = norm(target);
         // Inversa: rotación negativa modulo 360 -> ángulo que queda en 12h
         const pointerAngle = norm(-finalRot);
-        const visualIndex = Math.floor(pointerAngle / segment);
+        const visualIndex = (n - Math.floor(pointerAngle / segment)) % n;
         (window as any).__rouletteDebugHook({
           expectedIndex: index,
-            visualIndex,
-            pointerAngle,
-            segment,
-            rewardName: reward.name,
-            expectedName: data[index].name,
-            visualName: data[visualIndex]?.name
+          visualIndex,
+          actualReward: reward,
+          pointerAngle,
+          segment,
+          rewardName: reward.name,
+          expectedName: data[index].name,
+          visualName: data[visualIndex]?.name
         });
       }
     }, durationMs);
