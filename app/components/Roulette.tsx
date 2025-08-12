@@ -193,59 +193,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
     return `${reward.color} ${start}deg ${end}deg`;
   }).join(', ');
 
-  // Generamos los segmentos individuales para los textos
-  const segments = rewards.map((reward, index) => {
-    const angle = (360 / rewards.length);
-    const rotate = index * angle;
-    const textAngle = -rotate - (angle/2);
-    
-    // Calculamos la posición del texto en coordenadas polares
-    // Ajustamos para que esté más cerca del borde pero aún visible
-    const textRadiusPercent = 68; // distancia desde el centro (0-100%) 
-    const textRotateRad = ((rotate + angle/2) * Math.PI) / 180;
-    const textX = 50 + textRadiusPercent * Math.cos(textRotateRad);
-    const textY = 50 + textRadiusPercent * Math.sin(textRotateRad);
-    
-    return (
-      <div
-        key={reward.id}
-        className="absolute"
-        style={{
-          top: `${textY}%`,
-          left: `${textX}%`,
-          transform: `translate(-50%, -50%) rotate(${textAngle}deg)`,
-          width: '100px',
-          height: 'auto',
-          zIndex: 20
-        }}
-      >
-        <div
-          className={`text-center font-bold text-xs sm:text-sm md:text-base drop-shadow-md px-2 py-1 rounded-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
-          style={{
-            color: reward.textColor || '#fff',
-            background: 'rgba(0,0,0,0.5)',
-            textShadow: '0px 1px 2px rgba(0,0,0,0.9)',
-            lineHeight: 1.2,
-            border: '1px solid rgba(255,255,255,0.4)',
-            backdropFilter: 'blur(1px)',
-            fontWeight: 800,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {/* Iconos para cada premio */}
-          {reward.id === 1 && <span className="mr-1">🍬</span>}
-          {reward.id === 2 && <span className="mr-1">🚬</span>}
-          {reward.id === 3 && <span className="mr-1">🧠</span>}
-          {reward.id === 4 && <span className="mr-1">🍿</span>}
-          {reward.id === 5 && <span className="mr-1">💧</span>}
-          {reward.id === 6 && <span className="mr-1">🍭</span>}
-          {reward.id === 7 && <span className="mr-1">↺</span>}
-          {reward.name}
-        </div>
-      </div>
-    );
-  });
+    // Los segmentos se generarán dentro del componente Motion para asegurar que roten correctamente
 
   return (
     <div className="flex flex-col items-center max-w-full px-4">
@@ -304,7 +252,56 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           {/* Círculo central */}
           <div className="absolute inset-0 m-auto w-[35%] h-[35%] rounded-full bg-white/80 z-15 shadow-lg border-4 border-white/90"></div>
           
-          {segments}
+          {/* Etiquetas de premios - en capas superiores */}
+          {rewards.map((reward, index) => {
+            const angle = 360 / rewards.length;
+            const rotate = index * angle;
+            // Calculamos la posición del texto en coordenadas polares
+            // Ajustamos para que esté más cerca del borde pero aún visible
+            const textRadiusPercent = 68; // distancia desde el centro (0-100%) 
+            const textRotateRad = ((rotate + angle/2) * Math.PI) / 180;
+            const textX = 50 + textRadiusPercent * Math.cos(textRotateRad);
+            const textY = 50 + textRadiusPercent * Math.sin(textRotateRad);
+            const textAngle = -rotate - (angle/2);
+            
+            return (
+              <div
+                key={`label-${reward.id}`}
+                className="absolute"
+                style={{
+                  top: `${textY}%`,
+                  left: `${textX}%`,
+                  transform: `translate(-50%, -50%) rotate(${textAngle}deg)`,
+                  width: '100px',
+                  height: 'auto',
+                  zIndex: 50
+                }}
+              >
+                <div
+                  className={`text-center font-bold text-xs sm:text-sm md:text-base drop-shadow-md px-2 py-1 rounded-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
+                  style={{
+                    color: reward.textColor || '#fff',
+                    background: 'rgba(0,0,0,0.75)',
+                    textShadow: '0px 1px 2px rgba(0,0,0,0.9)',
+                    lineHeight: 1.2,
+                    border: '2px solid rgba(255,255,255,0.8)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {/* Iconos para cada premio */}
+                  {reward.id === 1 && <span className="mr-1">🍬</span>}
+                  {reward.id === 2 && <span className="mr-1">🚬</span>}
+                  {reward.id === 3 && <span className="mr-1">🧠</span>}
+                  {reward.id === 4 && <span className="mr-1">🍿</span>}
+                  {reward.id === 5 && <span className="mr-1">💧</span>}
+                  {reward.id === 6 && <span className="mr-1">🍭</span>}
+                  {reward.id === 7 && <span className="mr-1">↺</span>}
+                  {reward.name}
+                </div>
+              </div>
+            );
+          })}
             {/* Botón central */}
             <button
               onClick={spin}
