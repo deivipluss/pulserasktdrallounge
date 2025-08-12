@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Access Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+      white-space: pre-wrap;
+    }
+    h3 {
+      margin-top: 30px;
+    }
+    button {
+      padding: 8px 16px;
+      background-color: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    input {
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>CSV Access Test</h1>
+  
+  <h3>Test Today's CSV (2025-08-12)</h3>
+  <button onclick="testCSV('2025-08-12')">Test Today's CSV</button>
+  <div id="result1" class="result">Results will appear here...</div>
+  
+  <h3>Test CSV Path</h3>
+  <input type="text" id="csvPath" placeholder="/tokens/2025-08-12.csv" value="/tokens/2025-08-12.csv">
+  <button onclick="testCustomPath()">Test Custom Path</button>
+  <div id="result2" class="result">Results will appear here...</div>
+  
+  <h3>Test Token ID</h3>
+  <input type="text" id="tokenId" placeholder="ktd-2025-08-12-001" value="ktd-2025-08-12-001">
+  <button onclick="testToken()">Test Token</button>
+  <div id="result3" class="result">Results will appear here...</div>
+
+  <script>
+    // Test a specific date's CSV file
+    async function testCSV(date) {
+      const result = document.getElementById('result1');
+      result.textContent = 'Loading...';
+      
+      try {
+        const response = await fetch(`/tokens/${date}.csv`);
+        if (!response.ok) {
+          result.textContent = `Error: ${response.status} ${response.statusText}`;
+          return;
+        }
+        
+        const text = await response.text();
+        const lines = text.split('\n');
+        result.textContent = `Success! Found ${lines.length} lines.\n\nFirst 3 lines:\n${lines.slice(0, 3).join('\n')}`;
+      } catch (error) {
+        result.textContent = `Error: ${error.message}`;
+      }
+    }
+    
+    // Test a custom path
+    async function testCustomPath() {
+      const path = document.getElementById('csvPath').value;
+      const result = document.getElementById('result2');
+      result.textContent = 'Loading...';
+      
+      try {
+        const response = await fetch(path);
+        if (!response.ok) {
+          result.textContent = `Error: ${response.status} ${response.statusText}`;
+          return;
+        }
+        
+        const text = await response.text();
+        const lines = text.split('\n');
+        result.textContent = `Success! Found ${lines.length} lines.\n\nFirst 3 lines:\n${lines.slice(0, 3).join('\n')}`;
+      } catch (error) {
+        result.textContent = `Error: ${error.message}`;
+      }
+    }
+    
+    // Test token lookup
+    async function testToken() {
+      const tokenId = document.getElementById('tokenId').value;
+      const result = document.getElementById('result3');
+      result.textContent = 'Loading...';
+      
+      try {
+        // Extract date from token ID
+        const dateMatch = tokenId.match(/ktd-(\d{4}-\d{2}-\d{2})-\d+/);
+        if (!dateMatch || !dateMatch[1]) {
+          result.textContent = 'Error: Invalid token format';
+          return;
+        }
+        
+        const date = dateMatch[1];
+        const csvPath = `/tokens/${date}.csv`;
+        
+        // Fetch CSV
+        const response = await fetch(csvPath);
+        if (!response.ok) {
+          result.textContent = `Error: Could not load CSV file: ${response.status} ${response.statusText}`;
+          return;
+        }
+        
+        // Process CSV
+        const csvText = await response.text();
+        const lines = csvText.split('\n');
+        
+        // Search for token
+        let found = false;
+        for (const line of lines) {
+          if (line.startsWith(tokenId)) {
+            const fields = line.split(',');
+            if (fields.length >= 3) {
+              result.textContent = `Success! Found token in CSV.\n\nToken ID: ${fields[0]}\nDate: ${fields[1]}\nPrize: ${fields[2]}`;
+              found = true;
+              break;
+            }
+          }
+        }
+        
+        if (!found) {
+          result.textContent = `Error: Token ${tokenId} not found in ${csvPath}`;
+        }
+      } catch (error) {
+        result.textContent = `Error: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>

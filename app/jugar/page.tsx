@@ -44,14 +44,26 @@ function Play() {
       }
       
       const date = dateMatch[1];
+      // Ruta absoluta desde la raíz pública
       const csvPath = `/tokens/${date}.csv`;
       
-      // Intentar cargar el archivo CSV
-      const response = await fetch(csvPath);
+      console.log(`[DEBUG] Intentando cargar CSV desde: ${csvPath}`);
+      
+      // Intentar cargar el archivo CSV con opciones de caché
+      const response = await fetch(csvPath, { 
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
       if (!response.ok) {
-        console.error('No se pudo cargar el archivo CSV:', csvPath);
+        console.error('No se pudo cargar el archivo CSV:', csvPath, 'Status:', response.status);
         return null;
       }
+      
+      console.log(`[DEBUG] CSV cargado correctamente desde ${csvPath}`);
       
       const csvText = await response.text();
       const lines = csvText.split('\n');

@@ -9,13 +9,19 @@ import { env } from '@/app/lib/env';
  */
 export function validateSignedToken(id: string, sig: string): boolean {
   if (!id || !sig) return false;
+
   try {
-    const expected = crypto.createHmac('sha256', env.SIGNING_SECRET).update(id).digest('hex');
-    try {
-      return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
-    } catch {
-      return false; // Longitud inválida u otro detalle
-    }
+    // Generamos una firma basada en el ID y la comparamos con la proporcionada
+    const expectedSignature = crypto
+      .createHmac('sha256', env.SIGNING_SECRET)
+      .update(id)
+      .digest('hex');
+
+    // Comparación segura contra ataques de timing
+    return crypto.timingSafeEqual(
+      Buffer.from(sig, 'hex'),
+      Buffer.from(expectedSignature, 'hex')
+    );
   } catch (error) {
     console.error('Error al validar token:', error);
     return false;

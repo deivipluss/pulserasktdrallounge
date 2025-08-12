@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSignedToken } from '@/app/lib/token-utils';
-import { env } from '@/app/lib/env';
 
 /**
  * API para verificar tokens y redirigir adecuadamente.
@@ -20,28 +19,10 @@ export async function GET(request: NextRequest) {
 
   // Validar token
   const isValid = validateSignedToken(id, sig);
-  if (!isValid && process.env.DEBUG_TOKENS === '1') {
-    try {
-      // Recalcular firma esperada para depuración
-      const crypto = await import('crypto');
-      const expected = crypto.createHmac('sha256', env.SIGNING_SECRET).update(id).digest('hex');
-      console.warn('[verify-token] Invalid token', {
-        id,
-        providedSigHead: sig.slice(0, 12),
-        expectedSigHead: expected.slice(0, 12),
-        secretLen: env.SIGNING_SECRET.length,
-      });
-    } catch (e) {
-      console.warn('[verify-token] Debug error:', e);
-    }
-  }
   
   // Si el token no es válido, redirigir con mensaje de error
   if (!isValid) {
     const errorUrl = new URL('/acceso-denegado', request.url);
-    if (process.env.DEBUG_TOKENS === '1') {
-      errorUrl.searchParams.set('dbg', '1');
-    }
     return NextResponse.redirect(errorUrl);
   }
   
@@ -50,16 +31,5 @@ export async function GET(request: NextRequest) {
     ? new URL(redirect, request.url)
     : new URL('/' + redirect, request.url);
     
-  const response = NextResponse.redirect(finalRedirect);
-  // Set cookie de validación (httpOnly false porque solo necesitamos loop-prevention; vida corta)
-  try {
-    const sigPrefix = sig.slice(0, 16);
-    response.cookies.set('tkv', `${id}:${sigPrefix}`, {
-      path: '/jugar',
-      maxAge: 60, // 1 minuto es suficiente para evitar loops inmediatos
-      httpOnly: false,
-      sameSite: 'lax',
-    });
-  } catch {}
-  return response;
+  return NextResponse.redirect(finalRedirect);
 }

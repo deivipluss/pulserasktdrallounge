@@ -1,29 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { env } from '@/app/lib/env';
-import crypto from 'crypto';
-import { validateSignedToken } from '@/app/lib/token-utils';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: NextRequest) {
-  const url = req.nextUrl;
-  const id = url.searchParams.get('id');
-  const sig = url.searchParams.get('sig');
-  if (!id || !sig) {
-    return NextResponse.json({ ok: false, error: 'missing id or sig' }, { status: 400 });
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  
+  try {
+    if (!id) {
+      return NextResponse.json({ error: 'No ID provided' }, { status: 400 });
+    }
+    
+    const dateMatch = id.match(/ktd-(\d{4}-\d{2}-\d{2})-\d+/);
+    if (!dateMatch || !dateMatch[1]) {
+      return NextResponse.json({ error: 'Invalid token format' }, { status: 400 });
+    }
+    
+    const date = dateMatch[1];
+    const csvPath = `/tokens/${date}.csv`;
+    
+    // For debugging purposes
+    return NextResponse.json({
+      id,
+      date,
+      csvPath,
+      publicFolderStructure: true,
+      status: 'Debug token info retrieved successfully'
+    });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
-  const current = crypto.createHmac('sha256', env.SIGNING_SECRET).update(id).digest('hex');
-  const legacyCandidates: string[] = [];
-  // Intentar reconstruir posibles combinaciones legacy mínimas (heurística)
-  // Nota: la validación real en validateSignedToken carga metadatos CSV; aquí solo mostramos current.
-  const valid = validateSignedToken(id, sig);
-  return NextResponse.json({
-    ok: true,
-    id,
-    providedSigHead: sig.slice(0, 16),
-    providedLen: sig.length,
-    currentSigHead: current.slice(0, 16),
-    matchCurrent: sig === current,
-    legacyChecked: legacyCandidates.length > 0,
-    valid,
-    envSecretLen: env.SIGNING_SECRET.length,
-  });
 }

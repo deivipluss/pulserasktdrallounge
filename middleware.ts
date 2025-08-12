@@ -78,28 +78,15 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Si ya existe cookie de validación para este id+sig, permitir paso (evita loop)
-    const cookie = request.cookies.get('tkv');
-    if (cookie) {
-      const val = cookie.value; // formato esperado: id:sigprefix
-      const sigPrefix = sig.slice(0, 16);
-      if (val === `${id}:${sigPrefix}`) {
-        const res = NextResponse.next();
-        res.headers.set('x-mw', 'pass:cookie');
-        return res;
-      }
-    }
-
-    // En producción, redirigir a API de verificación (Node runtime) (solo una vez antes de setear cookie)
+    // En producción, redirigir a API de verificación (Node runtime)
     const verifyUrl = new URL('/api/verify-token', request.url);
     verifyUrl.searchParams.set('id', id);
     verifyUrl.searchParams.set('sig', sig);
-    // redirect original sin parámetros duplicados
-    verifyUrl.searchParams.set('redirect', pathname + `?id=${encodeURIComponent(id)}&sig=${encodeURIComponent(sig)}`);
+    verifyUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
 
-    const redir = NextResponse.redirect(verifyUrl);
-    redir.headers.set('x-mw', 'redir:verify');
-    return redir;
+    const res = NextResponse.redirect(verifyUrl);
+    res.headers.set('x-mw', 'redir:verify');
+    return res;
   } catch (err) {
     console.error('Edge middleware error:', err);
     const res = NextResponse.next();

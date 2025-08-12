@@ -120,6 +120,8 @@ pnpm ts-node scripts/generate-tokens.ts
 - `/app/components/SpinController.tsx`: Controlador para la ruleta
 - `/app/components/ResultDialog.tsx`: Diálogo accesible que muestra el resultado del giro
 - `/scripts/generate-tokens.ts`: Script para generar tokens preasignados en formato CSV
+- `/public/tokens/`: CSV files con premios preasignados por fecha (YYYY-MM-DD.csv)
+- `/docs/`: Documentación adicional y soluciones a problemas específicos
 
 ## Modos de Operación de la Ruleta
 
@@ -137,6 +139,17 @@ La aplicación implementa múltiples mejoras de accesibilidad:
 - **Focus Management**: Gestión del foco para navegación por teclado
 - **Safe-Area Insets**: Soporte para insets seguros en dispositivos móviles con notches o bordes redondeados
 - **Áreas táctiles ampliadas**: Botones CTA con área táctil aumentada para mejor usabilidad
+
+## Estructura de Archivos CSV de Tokens
+
+Los archivos CSV de tokens predefinidos deben ubicarse en el directorio `/public/tokens/` para ser accesibles desde el cliente. Cada archivo CSV sigue esta estructura:
+
+```
+id,day,prize,sig,url
+ktd-2025-08-11-001,2025-08-11,chupetines,662dd0c306e1b62e56d6406185b79c71f941ed2bc458b5307c81ed6f540e40f6,https://pulserasktdrallounge.vercel.app/jugar?id=ktd-2025-08-11-001&sig=662dd0c306e1b62e56d6406185b79c71f941ed2bc458b5307c81ed6f540e40f6
+```
+
+El sistema busca automáticamente el archivo CSV correspondiente a la fecha del token (formato `YYYY-MM-DD.csv`).
 
 ## Modo de Desarrollo
 

@@ -1,0 +1,303 @@
+'use client';
+
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
+import Roulette from '@/app/components/Roulette';
+import { hasIdPlayed, markIdAsPlayed } from '@/app/lib/played-storage';
+import { getEventTZ, getTimeUntilEvent } from '@/app/lib/client-env';
+
+// Estados posibles de la página
+enum PageState {
+  LOADING,
+  WAITING,
+  READY_TO_PLAY,
+  PLAYED,
+  ERROR
+}
+
+export default function PlayWrapper() {
+  return (
+    <Suspense fallback={<div>Cargando juego...</div>}>
+      <Play />
+    </Suspense>
+  );
+}
+
+function Play() {
+  const searchParams = useSearchParams();
+  const id = searchParams?.get('id') || '';
+  
+  const [state, setState] = useState<PageState>(PageState.LOADING);
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, hasStarted: false });
+  const [reward, setReward] = useState<any>(null);
+  const [predefinedPrize, setPredefinedPrize] = useState<string | null>(null);
+  
+  // Función para cargar el premio predeterminado desde el CSV
+  const loadPredefinedPrize = async (tokenId: string) => {
+    try {
+      // Extraemos la fecha del tokenId (formato: ktd-YYYY-MM-DD-NNN)
+      const dateMatch = tokenId.match(/ktd-(\d{4}-\d{2}-\d{2})-\d+/);
+      if (!dateMatch || !dateMatch[1]) {
+        console.error('Formato de ID de token inválido:', tokenId);
+        return null;
+      }
+      
+      const date = dateMatch[1];
+      const csvPath = `/tokens/${date}.csv`;
+      
+      // Intentar cargar el archivo CSV
+      const response = await fetch(csvPath);
+      if (!response.ok) {
+        console.error('No se pudo cargar el archivo CSV:', csvPath);
+        return null;
+      }
+      
+      const csvText = await response.text();
+      const lines = csvText.split('\n');
+      
+      // Buscar la línea que corresponde al ID del token
+      for (const line of lines) {
+        if (line.startsWith(tokenId)) {
+          const fields = line.split(',');
+          if (fields.length >= 3) {
+            return fields[2]; // El campo prize está en la posición 2
+          }
+        }
+      }
+      
+      console.error('Token no encontrado en el CSV:', tokenId);
+      return null;
+    } catch (error) {
+      console.error('Error al cargar premio predefinido:', error);
+      return null;
+    }
+  };
+
+  // Verificar el estado al cargar
+  useEffect(() => {
+    const checkState = async () => {
+      if (!id) {
+        setState(PageState.ERROR);
+        return;
+      }
+      
+      try {
+        // Cargar el premio predefinido para este token
+        const prize = await loadPredefinedPrize(id);
+        setPredefinedPrize(prize);
+        console.log(`[DEBUG] Premio predefinido para ${id}: ${prize}`);
+        
+        // Verificar si ya ha jugado anteriormente
+        if (await hasIdPlayed(id)) {
+          setState(PageState.PLAYED);
+          return;
+        }
+        
+        // Si no ha jugado, verificar si el evento ya comenzó
+        setState(PageState.WAITING);
+        
+        // Actualizar el contador
+        const timeUntil = getTimeUntilEvent();
+        setTimeLeft(timeUntil);
+        
+        if (timeUntil.hasStarted) {
+          setState(PageState.READY_TO_PLAY);
+        } else {
+          const interval = setInterval(() => {
+            const timeUntil = getTimeUntilEvent();
+            setTimeLeft(timeUntil);
+            
+            if (timeUntil.hasStarted) {
+              setState(PageState.READY_TO_PLAY);
+              clearInterval(interval);
+            }
+          }, 1000);
+          
+          return () => clearInterval(interval);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        setState(PageState.ERROR);
+      }
+    };
+    
+    checkState();
+  }, [id]);
+  
+  // Manejar el resultado de la ruleta
+  const handleRouletteResult = (result: any) => {
+    setReward(result);
+    markIdAsPlayed(id);
+    
+    // Cambiar al estado de "jugado" después de un retraso
+    setTimeout(() => {
+      setState(PageState.PLAYED);
+    }, 3000);
+  };
+  
+  // Renderizado condicional según el estado
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-md mx-auto">
+        {state === PageState.LOADING && (
+          <div className="flex flex-col items-center justify-center p-8">
+            <div className="w-16 h-16 border-4 border-t-fiesta-purple border-b-fiesta-pink border-l-fiesta-blue border-r-fiesta-teal rounded-full animate-spin mb-4"></div>
+            <p className="text-lg">Cargando...</p>
+          </div>
+        )}
+        
+        {state === PageState.WAITING && (
+          <motion.div 
+            className="bg-white dark:bg-gray-800 rounded-token-lg p-6 shadow-party-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <h1 className="text-fluid-2xl font-heading font-bold text-center mb-6">
+              El evento aún no ha comenzado
+            </h1>
+            
+            <div className="flex flex-col gap-2 mb-8">
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="flex flex-col bg-fiesta-purple/10 rounded-token p-2">
+                  <span className="text-fluid-2xl font-bold">{timeLeft.days}</span>
+                  <span className="text-xs uppercase text-gray-600 dark:text-gray-400">días</span>
+                </div>
+                <div className="flex flex-col bg-fiesta-blue/10 rounded-token p-2">
+                  <span className="text-fluid-2xl font-bold">{timeLeft.hours}</span>
+                  <span className="text-xs uppercase text-gray-600 dark:text-gray-400">horas</span>
+                </div>
+                <div className="flex flex-col bg-fiesta-teal/10 rounded-token p-2">
+                  <span className="text-fluid-2xl font-bold">{timeLeft.minutes}</span>
+                  <span className="text-xs uppercase text-gray-600 dark:text-gray-400">min</span>
+                </div>
+                <div className="flex flex-col bg-fiesta-orange/10 rounded-token p-2">
+                  <span className="text-fluid-2xl font-bold">{timeLeft.seconds}</span>
+                  <span className="text-xs uppercase text-gray-600 dark:text-gray-400">seg</span>
+                </div>
+              </div>
+              <p className="text-center text-sm text-gray-600 dark:text-gray-300">
+                Zona horaria: {getEventTZ()}
+              </p>
+            </div>
+            
+            <p className="text-center text-gray-600 dark:text-gray-300 mb-6">
+              Regresa cuando el evento haya comenzado para jugar y ganar premios.
+            </p>
+          </motion.div>
+        )}
+        
+        {state === PageState.READY_TO_PLAY && (
+          <motion.div 
+            className="bg-white dark:bg-gray-800 rounded-token-lg p-6 shadow-party-md"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <h1 className="text-fluid-2xl font-heading font-bold text-center mb-6">
+              ¡Gira la ruleta y gana!
+            </h1>
+            
+            {/* Ruleta con manejo de premio predefinido */}
+            <div>
+              <Roulette onResult={handleRouletteResult} />
+              
+              {/* Script para forzar el premio predefinido cuando esté disponible */}
+              {predefinedPrize && (
+                <script 
+                  dangerouslySetInnerHTML={{ 
+                    __html: `
+                      // Esperar a que el componente esté listo
+                      setTimeout(() => {
+                        try {
+                          console.log('[DEBUG] Intentando forzar premio: ${predefinedPrize}');
+                          if (typeof window.__rouletteForceByName === 'function') {
+                            window.__rouletteForceByName('${predefinedPrize}');
+                          }
+                        } catch (err) {
+                          console.error('Error al forzar premio:', err);
+                        }
+                      }, 1000);
+                    `
+                  }} 
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+        
+        {state === PageState.PLAYED && (
+          <motion.div 
+            className="bg-white dark:bg-gray-800 rounded-token-lg p-6 shadow-party-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-fiesta-orange/20 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-fiesta-orange">
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                  <path d="m9 12 2 2 4-4"></path>
+                </svg>
+              </div>
+              
+              <h2 className="text-fluid-2xl font-heading font-bold mb-2">
+                Pulsera ya utilizada
+              </h2>
+              
+              <p className="text-fluid-base text-gray-600 dark:text-gray-300 mb-6">
+                {reward 
+                  ? `Has ganado: ${reward.name}` 
+                  : 'Esta pulsera ya ha sido utilizada para jugar.'}
+              </p>
+              
+              <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-token mb-6">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Cada código QR puede ser utilizado solo una vez. Si necesitas ayuda, contacta a un organizador.
+                </p>
+              </div>
+              
+              <button 
+                onClick={() => window.location.href = '/'}
+                className="w-full py-3 px-6 bg-fiesta-blue text-white rounded-token font-medium text-center transition-all hover:bg-fiesta-blue/90"
+              >
+                Volver al inicio
+              </button>
+            </div>
+          </motion.div>
+        )}
+        
+        {state === PageState.ERROR && (
+          <motion.div 
+            className="bg-white dark:bg-gray-800 rounded-token-lg p-6 shadow-party-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 dark:text-red-400">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+              
+              <h2 className="text-fluid-2xl font-heading font-bold mb-2">
+                Código no válido
+              </h2>
+              
+              <p className="text-fluid-base text-gray-600 dark:text-gray-300 mb-6">
+                El código QR escaneado no es válido o ha expirado. Por favor, escanea un código QR válido para jugar.
+              </p>
+              
+              <button 
+                onClick={() => window.location.href = '/'}
+                className="w-full py-3 px-6 bg-fiesta-blue text-white rounded-token font-medium text-center transition-all hover:bg-fiesta-blue/90"
+              >
+                Volver al inicio
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}

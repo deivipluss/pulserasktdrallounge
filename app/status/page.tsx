@@ -81,7 +81,7 @@ export default function StatusPageWrapper() {
 
 function StatusPage() {
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams?.get('token') || '';
   
   // Estado de autenticación
   const [isAuthorized, setIsAuthorized] = useState(false);
