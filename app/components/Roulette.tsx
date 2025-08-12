@@ -107,8 +107,8 @@ const wheelRewards: Reward[] = [
   { id: 2, name: 'Cigarrillos', probability: 0.145, color: '#9B4DFF', textColor: '#FFFFFF' },
   { id: 3, name: 'Cerebritos', probability: 0.145, color: '#4D9EFF', textColor: '#FFFFFF' },
   { id: 4, name: 'Popcorn', probability: 0.145, color: '#31D2F2', textColor: '#000000' },
-  { id: 5, name: 'Agua', probability: 0.145, color: '#4DFFB8', textColor: '#065F46' },
-  { id: 6, name: 'Chupetines', probability: 0.245, color: '#FFD93D', textColor: '#7A4E00' },
+  { id: 5, name: 'Agua', probability: 0.145, color: '#4DFFB8', textColor: '#003B2A' }, // Oscurecido para mejor contraste
+  { id: 6, name: 'Chupetines', probability: 0.245, color: '#FFD93D', textColor: '#5F3A00' }, // Oscurecido para mejor contraste
   { id: 7, name: 'Un Nuevo Intento', probability: 0.03, color: '#FB923C', textColor: '#000000', sparkle: true, retry: true },
 ];
 
@@ -126,13 +126,48 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
   const totalProbability = rewards.reduce((a, r) => a + r.probability, 0);
   const wheelRef = useRef<HTMLDivElement>(null);
   
-  // Inyectamos los estilos CSS
+  // Calculamos las posiciones de las etiquetas basándonos en el tamaño actual de la ruleta
+  const calculateLabelPositions = () => {
+    if (!wheelRef.current) return;
+    
+    const radius = Math.min(wheelRef.current.offsetWidth, wheelRef.current.offsetHeight) * 0.43;
+    return rewards.map((_, index) => {
+      const angle = 360 / rewards.length;
+      const staticAngle = index * angle + (angle / 2);
+      // Calculamos la posición en coordenadas cartesianas
+      return {
+        x: Math.sin(staticAngle * Math.PI/180) * radius,
+        y: -Math.cos(staticAngle * Math.PI/180) * radius
+      };
+    });
+  };
+  
+    // Inyectamos los estilos CSS
   useEffect(() => {
-    const styleEl = document.createElement('style');
-    styleEl.textContent = styles;
-    document.head.appendChild(styleEl);
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = styles;
+    styleSheet.id = 'roulette-styles';
+    
+    if (!document.getElementById('roulette-styles')) {
+      document.head.appendChild(styleSheet);
+    }
+    
     return () => {
-      document.head.removeChild(styleEl);
+      const existingStyle = document.getElementById('roulette-styles');
+      if (existingStyle) existingStyle.remove();
+    };
+  }, []);
+  
+  // Efecto para manejar el redimensionamiento de la ventana
+  useEffect(() => {
+    const handleResize = () => {
+      // Forzar una actualización cuando cambia el tamaño
+      setRotation(prev => prev);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -167,6 +202,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
     // Agregamos un desplazamiento aleatorio dentro del segmento para más realismo
     const offset = Math.random() * (segmentSize * 0.5) - (segmentSize * 0.25);
   // 3 vueltas completas (1080) + ángulo centrado del segmento seleccionado
+  // Ya no necesitamos ajuste adicional de 90 grados porque lo aplicamos en el gradiente
   const endPosition = 1440 + (rewardIndex * segmentSize) + (segmentSize / 2) + offset;
     
     // Animamos la ruleta
@@ -206,7 +242,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           </div>
         </div>
         {/* Brillo / aura */}
-        <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/60 via-white/0 to-white/0 pointer-events-none"></div>
+        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.4),rgba(255,255,255,0),rgba(255,255,255,0))] pointer-events-none"></div>
         
         {/* Ruleta */}
         <motion.div
@@ -220,116 +256,121 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           }}
           style={{ 
             pointerEvents: 'all',
-            background: `conic-gradient(${conicGradient})`,
+            background: `conic-gradient(from -90deg, ${conicGradient})`,
             boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)'
           }}
         >
-          {/* Círculo exterior decorativo */}
-          <div className="absolute inset-0 rounded-full border-[8px] border-white/20 z-5"></div>
-        
-          {/* Líneas divisorias entre segmentos */}
+          {/* Líneas divisorias entre segmentos - Primero para asegurar que sean visibles */}
           {rewards.map((_, index) => {
             const rotate = index * segmentAngle;
             return (
               <div 
                 key={`line-${index}`}
-                className="absolute top-0 left-1/2 w-[3px] h-1/2 origin-bottom"
+                className="absolute top-0 left-1/2 w-[3px] h-[50%] origin-bottom"
                 style={{
                   transform: `translateX(-50%) rotate(${rotate}deg)`,
-                  background: 'rgba(255,255,255,0.6)',
+                  background: 'rgba(255,255,255,0.8)',
                   boxShadow: '0 0 5px rgba(0,0,0,0.3), 0 0 3px rgba(255,255,255,0.5)',
-                  zIndex: 12
+                  zIndex: 15 // Mayor z-index para asegurar visibilidad
                 }}
               />
             );
           })}
           
-          {/* Círculos decorativos para mayor realismo */}
-          <div className="absolute inset-[3%] rounded-full border-[1px] border-white/30 z-11"></div>
+          {/* Círculo exterior decorativo */}
+          <div className="absolute inset-0 rounded-full border-[8px] border-white/20 z-10"></div>
           
-          {/* Borde interno decorativo */}
-          <div className="absolute inset-8 rounded-full border-[3px] border-white/50 z-11 bg-white/5 backdrop-blur-[1px]"></div>
-
-          {/* Etiquetas de premios - colocadas cerca del borde exterior */}
-          {rewards.map((reward, index) => {
-            const angle = 360 / rewards.length;
-            const rotationAngle = index * angle + (angle / 2);
-            const textRadius = '85%'; // Mucho más cerca del borde exterior
-
-            return (
-              <div
-                key={`label-${reward.id}`}
-                className="absolute top-1/2 left-1/2 w-auto h-auto -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
+          {/* Círculos decorativos para mayor realismo */}
+          <div className="absolute inset-[3%] rounded-full border-[1px] border-white/30 z-10"></div>
+          
+          {/* Borde interno decorativo - sin blur */}
+          <div className="absolute inset-8 rounded-full border-[3px] border-white/50 z-10 bg-white/5"></div>
+          
+          {/* Círculo central - después de las etiquetas */}
+          <div className="absolute inset-0 m-auto w-[35%] h-[35%] rounded-full bg-white/80 z-30 shadow-lg border-4 border-white/90"></div>
+        </motion.div>
+        
+        {/* Etiquetas de premios - FUERA del div que gira para que siempre se vean horizontalmente */}
+        {rewards.map((reward, index) => {
+          const angle = 360 / rewards.length;
+          const staticAngle = index * angle + (angle / 2);
+          // Calculamos la posición de la etiqueta en coordenadas polares
+          const radius = Math.min(wheelRef.current?.offsetWidth || 0, wheelRef.current?.offsetHeight || 0) * 0.43; // 86% del radio
+          
+          // Posición actual basada en el ángulo de la ruleta y la posición original
+          const currentAngle = staticAngle - (rotation % 360);
+          const adjustedX = Math.sin(staticAngle * Math.PI/180) * radius;
+          const adjustedY = -Math.cos(staticAngle * Math.PI/180) * radius;
+          
+          return (
+            <div
+              key={`label-${reward.id}`}
+              className="absolute top-1/2 left-1/2 flex flex-col items-center pointer-events-none"
+              style={{
+                transform: `translate(${adjustedX}px, ${adjustedY}px)`,
+                zIndex: 30, // Aumentado para asegurar que esté sobre las líneas divisorias
+                transition: spinning ? 'none' : 'all 0.3s ease'
+              }}
+            >
+              <div className="text-lg" style={{ filter: 'drop-shadow(0 1px 1px #000)', marginBottom: '2px' }}>
+                {reward.id === 1 && <span>🍬</span>}
+                {reward.id === 2 && <span>🚬</span>}
+                {reward.id === 3 && <span>🧠</span>}
+                {reward.id === 4 && <span>🍿</span>}
+                {reward.id === 5 && <span>💧</span>}
+                {reward.id === 6 && <span>🍭</span>}
+                {reward.id === 7 && <span>↺</span>}
+              </div>
+              <span
+                className="font-bold text-xs uppercase tracking-wider text-center w-16 leading-tight"
                 style={{
-                  transform: `rotate(${rotationAngle}deg) translateY(-${textRadius})`,
-                  zIndex: 15,
+                  color: reward.textColor || '#fff',
+                  textShadow: reward.textColor === '#FFFFFF' 
+                    ? '0px 0px 4px rgba(0,0,0,0.9), 0px 1px 2px #000' // Sombra más fuerte para texto blanco
+                    : '0px 1px 0px #fff, 0px 0px 4px rgba(0,0,0,0.6)', // Contorno blanco para texto oscuro
+                  backgroundColor: 'rgba(255,255,255,0.12)',
+                  // Eliminado el backdrop-filter para evitar que se lave el color
+                  padding: '1px 3px',
+                  borderRadius: '3px'
                 }}
               >
-                <div 
-                  className="flex flex-col items-center justify-center"
-                  style={{
-                    transform: `rotate(${rotationAngle < 180 ? 180 - rotationAngle : 540 - rotationAngle}deg)` // Orientación alineada con cada sección
-                  }}
-                >
-                  <span
-                    className="font-bold text-xs uppercase tracking-wider text-center w-16 leading-none"
-                    style={{
-                      color: reward.textColor || '#fff',
-                      textShadow: '0px 1px 3px rgba(0,0,0,0.7)',
-                    }}
-                  >
-                    {reward.name}
-                  </span>
-                  
-                  <div className="text-lg mt-1" style={{ textShadow: '0 0 5px rgba(0,0,0,0.5)'}}>
-                    {reward.id === 1 && <span>🍬</span>}
-                    {reward.id === 2 && <span>🚬</span>}
-                    {reward.id === 3 && <span>🧠</span>}
-                    {reward.id === 4 && <span>🍿</span>}
-                    {reward.id === 5 && <span>💧</span>}
-                    {reward.id === 6 && <span>🍭</span>}
-                    {reward.id === 7 && <span>↺</span>}
-                  </div>
-                </div>
+                {reward.name}
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Botón central - FUERA del div que gira */}
+        <button
+          onClick={spin}
+          disabled={spinning || disabled}
+          style={{zIndex: 40, pointerEvents: 'auto'}}
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-28 w-28 rounded-full font-bold tracking-wide flex flex-col items-center justify-center transition-all shadow-xl border-[6px] 
+            ${spinning || disabled 
+            ? 'bg-gray-400 cursor-not-allowed text-white border-white/40' 
+            : 'bg-gradient-to-br from-fiesta-purple to-fiesta-pink hover:scale-110 hover:rotate-3 active:scale-95 text-white border-white/90'}`}
+        >
+          {/* Efectos decorativos del botón */}
+          <div className="absolute inset-2 rounded-full bg-gradient-to-tr from-white/40 via-transparent to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 rounded-full border-2 border-white/30 animate-pulse-slow pointer-events-none"></div>
+          
+          {spinning ? (
+            <div className="flex flex-col items-center">
+              <span className="text-lg font-bold">GIRANDO</span>
+              <div className="mt-1 flex gap-1">
+                <span className="animate-bounce delay-0">•</span>
+                <span className="animate-bounce delay-100">•</span>
+                <span className="animate-bounce delay-200">•</span>
               </div>
-            );
-          })}
-          
-          {/* Círculo central - después de las etiquetas pero antes del botón */}
-          <div className="absolute inset-0 m-auto w-[35%] h-[35%] rounded-full bg-white/80 z-30 shadow-lg border-4 border-white/90"></div>
-          
-          {/* Botón central */}
-            <button
-              onClick={spin}
-              disabled={spinning || disabled}
-              style={{zIndex: 40, pointerEvents: 'auto'}} // zIndex ajustado
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-28 w-28 rounded-full font-bold tracking-wide flex flex-col items-center justify-center transition-all shadow-xl border-[6px] 
-               ${spinning || disabled 
-                ? 'bg-gray-400 cursor-not-allowed text-white border-white/40' 
-                : 'bg-gradient-to-br from-fiesta-purple to-fiesta-pink hover:scale-110 hover:rotate-3 active:scale-95 text-white border-white/90'}`}
-            >
-              {/* Efectos decorativos del botón */}
-              <div className="absolute inset-2 rounded-full bg-gradient-to-tr from-white/40 via-transparent to-transparent pointer-events-none"></div>
-              <div className="absolute inset-0 rounded-full border-2 border-white/30 animate-pulse-slow pointer-events-none"></div>
-              
-              {spinning ? (
-                <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold">GIRANDO</span>
-                  <div className="mt-1 flex gap-1">
-                    <span className="animate-bounce delay-0">•</span>
-                    <span className="animate-bounce delay-100">•</span>
-                    <span className="animate-bounce delay-200">•</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <span className="text-xl font-extrabold tracking-widest">GIRAR</span>
-                  <div className="h-px w-3/4 bg-white/60 my-1"></div>
-                  <span className="text-xs opacity-90 mt-0.5">¡BUENA SUERTE!</span>
-                </div>
-              )}
-            </button>
-        </motion.div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <span className="text-xl font-extrabold tracking-widest">GIRAR</span>
+              <div className="h-px w-3/4 bg-white/60 my-1"></div>
+              <span className="text-xs opacity-90 mt-0.5">¡BUENA SUERTE!</span>
+            </div>
+          )}
+        </button>
       </div>
       <AnimatePresence>
         {result && (
