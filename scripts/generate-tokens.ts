@@ -66,9 +66,11 @@ function generateTokenId(day: string, index: number): string {
  * @param prizeKey - Clave del premio asignado (en minúsculas)
  * @param secret - Clave secreta para la firma
  */
-function signToken(id: string, day: string, prizeKey: string, secret: string): string {
-  const data = `${id}|${day}|${prizeKey}`;
-  return cryptoLib.createHmac('sha256', secret).update(data).digest('hex');
+// IMPORTANTE: La app en producción valida la firma usando ONLY el ID (validateSignedToken)
+// Antes firmábamos id|day|prizeKey lo que hacía que siempre falle la validación.
+// Ajustamos para firmar solo el id y así ser compatibles con el runtime.
+function signToken(id: string, _day: string, _prizeKey: string, secret: string): string {
+  return cryptoLib.createHmac('sha256', secret).update(id).digest('hex');
 }
 
 program
