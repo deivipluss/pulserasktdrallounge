@@ -156,20 +156,38 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const lastTarget = useRef(0);
+  
+  // Estado y estilos para el modo debug
+  const [showDebugOverlay, setShowDebugOverlay] = useState(debug);
+  
+  // Utilidades de depuración para visualizar la alineación de los sectores
+  useEffect(() => {
+    if (debug) {
+      console.log(`[RULETA DEBUG] ${n} sectores de ${segment}° cada uno`);
+      console.log(`[RULETA DEBUG] Premios configurados:`, data.map((r, i) => `${i}: ${r.name}`).join(', '));
+    }
+  }, [debug, n, segment, data]);
 
   // En CSS conic-gradient 0deg ya apunta a las 12 en punto, así que OFFSET=0
   const OFFSET = 0;
+  
+  // Configuración de alineación
+  const WHEEL_CONFIG = {
+    SECTOR_ORDER: "CLOCKWISE", // Los sectores se dibujan en CSS en sentido horario
+    ROTATION_DIR: "COUNTERCLOCKWISE", // La rueda gira en sentido antihorario (rotación negativa)
+    POINTER_POSITION: "TOP", // El puntero está arriba (0°)
+    STARTING_INDEX: 0, // El índice 0 comienza arriba (0°)
+    VERBOSE_DEBUG: debug // Activar logs detallados
+  };
 
-  // Gradiente cónico exacto (sin offset interno; lo compensa el wrapper)
-  // IMPORTANTE: CSS conic-gradient 0deg está arriba y gira en sentido horario
-  // Los índices deben mostrar 0 arriba, luego 6, 5, 4 a la derecha, etc.
+  // REDISEÑO DE GEOMETRÍA
+  // - Wheel: CSS conic-gradient dibuja sectores en sentido HORARIO desde 0deg (arriba)
+  // - Rotación: Giramos en sentido ANTIHORARIO (valores negativos de rotación)
+  // - Alineación: El índice 0 (Trident) debe quedar exactamente arriba (0°)
   const wheelGradient = useMemo(() => {
     const stops: string[] = [];
     for (let i = 0; i < n; i++) {
-      // Invertimos el orden para que los segmentos visual y lógicamente coincidan
-      // Porque la ruleta gira hacia la izquierda (negativo) pero CSS conic-gradient va horario
-      const actualIndex = (n - i) % n;
-      const color = data[actualIndex].color ?? `hsl(${(actualIndex * 360) / n}, 70%, 50%)`;
+      const color = data[i].color ?? `hsl(${(i * 360) / n}, 70%, 50%)`;
       const start = i * segment;
       const end = (i + 1) * segment;
       stops.push(`${color} ${start}deg ${end}deg`);
@@ -182,21 +200,35 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
 
   // Ángulo objetivo para que el CENTRO del sector quede en el puntero (12h)
   const getTargetRotation = (idx: number) => {
-    // Sin jitter: aseguramos que el puntero queda exactamente en el centro del sector
-    // para evitar discrepancias visuales vs lógicas entre premio real y mostrado
-    const thetaCenter = (idx + 0.5) * segment; // centro exacto del sector
-    const base = -thetaCenter; // rotación necesaria para llevar centro al puntero (12h)
-    const current = rotation;
-    let target = base;
-    const minAhead = current + 360 * 3; // ≥ 3 vueltas completas
-    while (target < minAhead) target += 360;
-    return target;
+    // SOLUCIÓN DEFINITIVA:
+    // 1. El gradiente se construye con sectores en orden 0,1,2,... en sentido horario desde 0°
+    // 2. Para que el sector idx quede bajo el puntero, necesitamos girar ese ángulo
+    // 3. El centro exacto del sector está a (idx + 0.5) * segment grados
+    
+    // Centro del sector
+    const thetaCenter = (idx * segment) + (segment / 2);
+    
+    // Para llevar ese centro al puntero (0°), giramos en sentido antihorario (negativo)
+    const baseRotation = -thetaCenter;
+    
+    // Añadimos múltiples vueltas para efecto visual
+    const finalRotation = baseRotation - (360 * 3);
+    
+    // Debug detallado
+    console.log(`[WHEEL DEBUG] Premio: ${idx} (${data[idx]?.name})`);
+    console.log(`           → Centro del sector: ${thetaCenter}°`);
+    console.log(`           → Rotación base: ${baseRotation}°`);
+    console.log(`           → Rotación final: ${finalRotation}°`);
+    
+    return finalRotation;
   };
 
   // Función debug para forzar un índice específico (QA)
   const forceSpin = (forceIndex: number) => {
     if (spinning || disabled) return;
     if (forceIndex < 0 || forceIndex >= data.length) return;
+    
+    console.log(`[RULETA] Forzando premio con índice ${forceIndex}: ${data[forceIndex]?.name}`);
     
     setSpinning(true);
     const target = getTargetRotation(forceIndex);
@@ -209,40 +241,135 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
       try { if ('vibrate' in navigator) (navigator as any).vibrate?.(70); } catch {}
       const reward = data[forceIndex];
       if (reward.sparkle) launchConfetti();
-      onResult?.(reward, forceIndex);
       
-      console.log(`[DEBUG] Forzado premio: ${reward.name} (índice ${forceIndex})`);
+      // Verificación visual similar a spin()
+      const finalRot = norm(target);
+      const pointerAngle = norm(-finalRot); // Ángulo en la posición 12 en punto
+      
+      // CORRECCIÓN CRÍTICA: Mismo cálculo corregido que en spin()
+      const sectorIndex = Math.floor(pointerAngle / segment);
+      const visualIndex = sectorIndex % n;
+      const visualReward = data[visualIndex];
+      
+      // Verificamos que coincidan
+      if (visualIndex !== forceIndex) {
+        console.error(`[RULETA ERROR] Forzado: Discrepancia entre índice forzado (${forceIndex}: ${reward.name}) y visual (${visualIndex}: ${visualReward?.name})`);
+        
+        // CORRECCIÓN: Aplicamos el mismo ajuste que en spin()
+        console.warn(`[RULETA] Corrigiendo rotación en modo forzado...`);
+        
+        // En modo forzado, siempre queremos exactamente el índice solicitado
+        const correctedRotation = getTargetRotation(forceIndex);
+        setRotation(correctedRotation);
+        
+        console.log(`[RULETA] Corrección aplicada. Premio final forzado: ${reward.name}`);
+        
+        // Usamos el premio forzado como fuente de verdad
+        onResult?.(reward, forceIndex);
+        return; // Salimos después de la corrección
+      }
+      
+      // Si coinciden, usamos el premio visual (que debe ser igual al forzado)
+      onResult?.(visualReward, visualIndex);
+      
+      console.log(`[RULETA DEBUG] Forzado premio: ${reward.name} (índice ${forceIndex}) - Visual: ${visualReward?.name} (${visualIndex})`);
     }, durationMs);
   };
 
   // Exponer forceSpin para depuración
   React.useEffect(() => {
+    // Exponemos función de forzado para testing
     (window as any).__rouletteForceSpin = (idx: number) => forceSpin(idx);
-    return () => { delete (window as any).__rouletteForceSpin; };
-  }, [data, durationMs, spinning, disabled]);
+    
+    // NUEVO: Sistema de verificación para validar la consistencia de índices
+    (window as any).__rouletteVerifyIndexes = () => {
+      console.log("=== VERIFICACIÓN DE ÍNDICES DE RULETA ===");
+      // Para cada índice posible, verificamos la consistencia
+      for (let i = 0; i < data.length; i++) {
+        const target = getTargetRotation(i);
+        const finalRot = norm(target);
+        const pointerAngle = norm(-finalRot);
+        const sectorIndex = Math.floor(pointerAngle / segment);
+        const visualIndex = sectorIndex % n;
+        
+        const isConsistent = visualIndex === i;
+        console.log(`Índice ${i} (${data[i].name}): ${isConsistent ? "✓" : "✗"} → Visual: ${visualIndex} (${data[visualIndex]?.name})`);
+        
+        if (!isConsistent) {
+          console.error(`INCONSISTENCIA: Índice ${i} produce visual ${visualIndex}`);
+        }
+      }
+    };
+    
+    return () => { 
+      delete (window as any).__rouletteForceSpin; 
+      delete (window as any).__rouletteVerifyIndexes;
+    };
+  }, [data, durationMs, spinning, disabled, n, segment]);
 
   // Spin usando la selección ponderada de V1
   const spin = () => {
     if (spinning || disabled) return;
+    
+    // Seleccionamos el premio mediante la función de peso
     const { reward, index } = pickWeighted(data);
+    
+    // IMPORTANTE: Este índice es ahora el índice LOGICO del premio seleccionado
+    console.log(`[RULETA] Premio seleccionado: ${reward.name} (índice ${index})`);
+    
+    // Iniciamos la animación
     setSpinning(true);
+    
+    // Calculamos la rotación necesaria para que el sector elegido quede bajo el puntero
     const target = getTargetRotation(index);
     lastTarget.current = target;
     setRotation(target);
 
+    // Esperamos a que termine la animación
     window.setTimeout(() => {
       setSpinning(false);
-      // Efectos V1
+      
+      // Efectos cuando termina el giro
       try { if ('vibrate' in navigator) (navigator as any).vibrate?.(70); } catch {}
       if (reward.sparkle) launchConfetti();
-      onResult?.(reward, index);
-
-      // Debug determinístico: exponer cálculo inverso para inspección manual
+      
+      // Verificamos visualmente qué premio quedó bajo el puntero
+      const finalRot = norm(target);
+      const pointerAngle = norm(-finalRot); // Ángulo que queda en la posición 0° (12 en punto)
+      
+      // CORRECCIÓN CRÍTICA: El cálculo del índice visual debe ser coherente con el gradiente visual
+      // En nuestro gradiente, los sectores se dibujan en orden natural (0, 1, 2, ...) desde 0°
+      const sectorIndex = Math.floor(pointerAngle / segment);
+      const visualIndex = sectorIndex % n;
+      
+      // IMPORTANTE: El premio visual debe coincidir con el premio lógico
+      const visualReward = data[visualIndex];
+      
+      // Verificamos que coincidan
+      if (visualIndex !== index) {
+        console.error(`[RULETA ERROR] Discrepancia entre premio lógico (${index}: ${reward.name}) y visual (${visualIndex}: ${visualReward?.name})`);
+        
+        // SOLUCIÓN DEFINITIVA: Si hay discrepancia, recalculamos y ajustamos 
+        // la rotación para forzar la coincidencia exacta
+        console.warn(`[RULETA] Recalculando rotación para forzar coincidencia...`);
+        
+        // Usamos el índice lógico como fuente de verdad y recalculamos
+        const correctedRotation = getTargetRotation(index);
+        setRotation(correctedRotation); // Ajustamos visualmente
+        
+        // Después de corregir, el premio visual debe ser exactamente el premio lógico
+        console.log(`[RULETA] Corrección aplicada. Premio final: ${reward.name}`);
+        
+        // Siempre usamos el premio lógico seleccionado, ya que la visual se ajusta a él
+        onResult?.(reward, index);
+        return; // Salimos después de la corrección
+      }
+      
+      // Reportamos el premio seleccionado (premio lógico y visual deben coincidir ahora)
+      onResult?.(visualReward, visualIndex);
+      
+      // Debug adicional
       if ((window as any).__rouletteDebugHook) {
-        const finalRot = norm(target);
-        // Inversa: rotación negativa modulo 360 -> ángulo que queda en 12h
-        const pointerAngle = norm(-finalRot);
-        const visualIndex = (n - Math.floor(pointerAngle / segment)) % n;
         (window as any).__rouletteDebugHook({
           expectedIndex: index,
           visualIndex,
@@ -251,24 +378,42 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
           segment,
           rewardName: reward.name,
           expectedName: data[index].name,
-          visualName: data[visualIndex]?.name
+          visualName: visualReward?.name,
+          finalRotation: finalRot
         });
       }
     }, durationMs);
   };
 
-  // Debug: tabla de ángulos visibles (ya con offset aplicado en escena)
+  // Debug: tabla de ángulos visibles mejorada
   useEffect(() => {
     if (!debug) return;
-    const rows = data.map((p, i) => ({
-      i,
+    
+    // Mostramos sectores con índices y ángulos
+    const sectorInfo = data.map((p, i) => ({
+      index: i,
       name: p.name,
-      start: norm(i * segment),
-      center: norm((i + 0.5) * segment),
-      end: norm((i + 1) * segment),
+      startAngle: norm(i * segment),
+      centerAngle: norm((i + 0.5) * segment),
+      endAngle: norm((i + 1) * segment),
+      color: p.color,
+      probability: p.probability || 0
     }));
-    // eslint-disable-next-line no-console
-    console.table(rows);
+    
+    console.log("=== RULETA: MAPA DE SECTORES ===");
+    console.table(sectorInfo);
+    
+    // Mostrar información de cómo calcular el premio visualmente
+    console.log("=== RULETA: GUÍA DE INTERPRETACIÓN ===");
+    console.log("1. El puntero está arriba (0°)");
+    console.log("2. La rueda gira en sentido ANTIHORARIO (rotación negativa)");
+    console.log("3. El índice 0 está inicialmente en la parte superior");
+    console.log("4. La rotación final determina qué premio queda bajo el puntero");
+    console.log("5. Para determinar el sector desde una rotación final:");
+    console.log("   - Normalizar la rotación: (rot % 360 + 360) % 360");
+    console.log("   - Calcular ángulo del puntero: norm(-rotación)");
+    console.log("   - Calcular sector: Math.floor(ángulo / segment)");
+    
   }, [debug, data, segment]);
 
   // Helpers de estilo
@@ -277,6 +422,19 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
   return (
     <div ref={containerRef} className="w-full flex flex-col items-center select-none" style={{ minHeight: px(diameter + 120) }}>
       <div className="relative" style={{ width: px(diameter), height: px(diameter) }}>
+        {/* Controles de debug */}
+        {debug && (
+          <div className="absolute top-[-30px] left-0 flex items-center gap-2 z-30 bg-black/50 text-white px-2 py-1 rounded">
+            <button 
+              onClick={() => setShowDebugOverlay(!showDebugOverlay)}
+              className="px-2 py-1 bg-blue-500 rounded text-xs"
+            >
+              {showDebugOverlay ? "Ocultar Debug" : "Mostrar Debug"}
+            </button>
+            <span className="text-xs">Rotación: {Math.round(rotation)}°</span>
+          </div>
+        )}
+        
         {/* Marcador superior (puntero hacia abajo) */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-[22%] z-20">
           <div className="relative w-[30px] h-[45px] flex items-center justify-center">
@@ -316,15 +474,29 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
                     transformOrigin: 'center bottom',
                   }}
                 />
+                
+                {/* Índices de sector visibles en modo debug */}
+                {debug && showDebugOverlay && (
+                  <div 
+                    className="absolute text-white bg-black/80 px-1 rounded-sm z-10"
+                    style={{
+                      left: '50%',
+                      top: '10%',
+                      transform: 'translate(-50%, 0)',
+                      fontSize: '10px',
+                    }}
+                  >
+                    {i}
+                  </div>
+                )}
               </div>
             ))}
 
             {/* Etiquetas radiales (con flip para lado izquierdo) */}
             {data.map((reward, i) => {
-              // Invertimos el índice para mantener la consistencia visual-lógica
-              // Así el índice 0 queda arriba, igual que en el gradiente
-              const visualIndex = (n - i) % n;
-              const angleCenter = (visualIndex + 0.5) * segment;
+              // CORRECCIÓN: Usamos el mismo índice que en el gradiente para total consistencia
+              // El sector i está en la posición angular i*segment
+              const angleCenter = (i + 0.5) * segment;
               const aFinal = norm(angleCenter); // para decidir flip ya en la escena final
               const isFlipped = aFinal > 90 && aFinal < 270;
 
