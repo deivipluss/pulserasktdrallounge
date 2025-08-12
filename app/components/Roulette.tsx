@@ -177,8 +177,11 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
 
   // Ángulo objetivo para que el CENTRO del sector quede en el puntero (12h)
   const getTargetRotation = (idx: number) => {
-    const jitter = (Math.random() - 0.5) * (segment * 0.5); // pequeño jitter dentro del sector
-  const thetaCenter = (idx + 0.5) * segment + jitter; // centro del sector
+  // Pequeño jitter controlado para evitar que siempre se detenga exactamente en el centro.
+  // Demasiado jitter podía cruzar la línea y aparentar un premio distinto visualmente.
+  const JITTER_FRACTION = 0.08; // 8% del ancho del sector (antes 50%)
+  const jitter = (Math.random() - 0.5) * (segment * JITTER_FRACTION);
+  const thetaCenter = (idx + 0.5) * segment + jitter; // centro (con jitter seguro)
   const base = -(thetaCenter); // rotación necesaria para llevar centro al puntero (12h)
     const current = rotation;
     let target = base;
@@ -202,6 +205,23 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
       try { if ('vibrate' in navigator) (navigator as any).vibrate?.(70); } catch {}
       if (reward.sparkle) launchConfetti();
       onResult?.(reward, index);
+
+      // Debug determinístico: exponer cálculo inverso para inspección manual
+      if ((window as any).__rouletteDebugHook) {
+        const finalRot = norm(target);
+        // Inversa: rotación negativa modulo 360 -> ángulo que queda en 12h
+        const pointerAngle = norm(-finalRot);
+        const visualIndex = Math.floor(pointerAngle / segment);
+        (window as any).__rouletteDebugHook({
+          expectedIndex: index,
+            visualIndex,
+            pointerAngle,
+            segment,
+            rewardName: reward.name,
+            expectedName: data[index].name,
+            visualName: data[visualIndex]?.name
+        });
+      }
     }, durationMs);
   };
 
