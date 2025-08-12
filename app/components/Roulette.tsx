@@ -278,10 +278,32 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
 
   // Exponer forceSpin para depuración
   React.useEffect(() => {
-    // Exponemos función de forzado para testing
+    // Exponemos función de forzado por índice
     (window as any).__rouletteForceSpin = (idx: number) => forceSpin(idx);
     
-    // NUEVO: Sistema de verificación para validar la consistencia de índices
+    // NUEVA FUNCIÓN: Forzar por nombre del premio (case-insensitive)
+    (window as any).__rouletteForceByName = (prizeName: string) => {
+      if (!prizeName) return false;
+      
+      // Convertir a minúsculas para comparación sin importar mayúsculas/minúsculas
+      const lowerName = prizeName.toLowerCase();
+      
+      // Buscar el índice que corresponde a ese nombre
+      const prizeIndex = data.findIndex(
+        p => p.name.toLowerCase() === lowerName
+      );
+      
+      if (prizeIndex >= 0) {
+        console.log(`[RULETA] Forzando premio "${prizeName}" encontrado en índice ${prizeIndex}`);
+        forceSpin(prizeIndex);
+        return true;
+      } else {
+        console.error(`[RULETA ERROR] No se encontró premio con nombre "${prizeName}"`);
+        return false;
+      }
+    };
+    
+    // Sistema de verificación para validar la consistencia de índices
     (window as any).__rouletteVerifyIndexes = () => {
       console.log("=== VERIFICACIÓN DE ÍNDICES DE RULETA ===");
       // Para cada índice posible, verificamos la consistencia
@@ -302,7 +324,8 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
     };
     
     return () => { 
-      delete (window as any).__rouletteForceSpin; 
+      delete (window as any).__rouletteForceSpin;
+      delete (window as any).__rouletteForceByName;
       delete (window as any).__rouletteVerifyIndexes;
     };
   }, [data, durationMs, spinning, disabled, n, segment]);
