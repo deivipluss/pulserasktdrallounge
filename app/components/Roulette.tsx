@@ -270,23 +270,25 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                   top: `${textY}%`,
                   left: `${textX}%`,
                   transform: `translate(-50%, -50%) rotate(${textAngle}deg)`,
-                  width: '120px', // Ampliado para más espacio
+                  width: '140px', // Ampliado más para textos largos
                   height: 'auto',
-                  zIndex: 60 // Aumentamos para estar seguro que es visible
+                  zIndex: 100, // Máxima prioridad visual
+                  pointerEvents: 'none' // Para evitar problemas con el botón de girar
                 }}
               >
                 <div
                   className={`text-center font-bold text-xs sm:text-sm md:text-base drop-shadow-md px-3 py-2 rounded-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
                   style={{
                     color: reward.textColor || '#fff',
-                    background: 'rgba(0,0,0,0.85)', // Más oscuro para mejor contraste
+                    background: 'rgba(0,0,0,0.9)', // Casi negro para máximo contraste
                     textShadow: '0px 2px 3px rgba(0,0,0,0.9)',
                     lineHeight: 1.2,
-                    border: '2px solid rgba(255,255,255,0.9)',
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.5), 0 0 10px rgba(255,255,255,0.3)',
+                    border: '3px solid rgba(255,255,255,1)', // Borde completamente blanco
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.7), 0 0 15px rgba(255,255,255,0.5)',
                     whiteSpace: 'nowrap',
                     transform: 'scale(1.1)', // Ligeramente más grande
-                    fontWeight: 800 // Más grueso
+                    fontWeight: 800, // Más grueso
+                    opacity: 1 // Asegurar que sea completamente visible
                   }}
                 >
                   {/* Iconos para cada premio */}
@@ -300,7 +302,10 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                       {reward.id === 6 && <span>🍭</span>}
                       {reward.id === 7 && <span>↺</span>}
                     </div>
-                    <div className="font-extrabold text-base" style={{textShadow: '0 0 5px white, 0 0 5px black'}}>{reward.name}</div>
+                    <div className="font-extrabold text-base" style={{
+                      textShadow: '0 0 5px white, 0 0 5px black, 0 0 3px white',
+                      letterSpacing: '0.5px'
+                    }}>{reward.name}</div>
                   </div>
                 </div>
               </div>
