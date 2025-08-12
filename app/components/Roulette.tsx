@@ -70,13 +70,13 @@ interface Reward {
 // Distribución original (104): cada uno 16 (≈15.38%) excepto Chupetines 24 (≈23.08%).
 // Añadimos Especial con 2% y reducimos ligeramente los demás proporcionalmente.
 const wheelRewards: Reward[] = [
-  { id: 1, name: 'Trident', probability: 0.145, color: '#FF4D8D' },
-  { id: 2, name: 'Cigarrillos', probability: 0.145, color: '#9B4DFF' },
-  { id: 3, name: 'Cerebritos', probability: 0.145, color: '#4D9EFF' },
-  { id: 4, name: 'Popcorn', probability: 0.145, color: '#31D2F2' },
+  { id: 1, name: 'Trident', probability: 0.145, color: '#FF4D8D', textColor: '#FFFFFF' },
+  { id: 2, name: 'Cigarrillos', probability: 0.145, color: '#9B4DFF', textColor: '#FFFFFF' },
+  { id: 3, name: 'Cerebritos', probability: 0.145, color: '#4D9EFF', textColor: '#FFFFFF' },
+  { id: 4, name: 'Popcorn', probability: 0.145, color: '#31D2F2', textColor: '#000000' },
   { id: 5, name: 'Agua', probability: 0.145, color: '#4DFFB8', textColor: '#065F46' },
   { id: 6, name: 'Chupetines', probability: 0.245, color: '#FFD93D', textColor: '#7A4E00' },
-  { id: 7, name: 'Un Nuevo Intento', probability: 0.03, color: '#FB923C', sparkle: true, retry: true },
+  { id: 7, name: 'Un Nuevo Intento', probability: 0.03, color: '#FB923C', textColor: '#000000', sparkle: true, retry: true },
 ];
 
 interface RouletteProps {
@@ -164,16 +164,18 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           style={{
             top: '50%', left: '50%',
             transform: `rotate(${rotate}deg) translate(-50%, -50%)`,
-            color: reward.textColor || '#fff'
+            color: reward.textColor || '#fff',
+            zIndex: 10
           }}
         >
           <div
             style={{
               transform: `rotate(${textAngle}deg) translateY(-${labelRadius}%)`,
               textAlign: 'center',
-              width: '90px'
+              width: '90px',
+              textShadow: '0px 0px 3px rgba(0,0,0,0.5)'
             }}
-            className="drop-shadow-sm leading-tight px-1"
+            className="drop-shadow-sm leading-tight px-1 font-bold"
           >
             {reward.name}
           </div>
@@ -184,7 +186,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-72 h-72 sm:w-[22rem] sm:h-[22rem] mb-10 select-none">
+      <div className="relative w-72 h-72 sm:w-[22rem] sm:h-[22rem] mb-10 select-none" style={{ touchAction: 'manipulation' }}>
         {/* Marcador superior */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-[18%] z-20">
           <div className="w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-b-[30px] border-b-fiesta-orange drop-shadow-md"></div>
@@ -197,6 +199,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           className={`w-full h-full rounded-full relative overflow-hidden border-[6px] border-white shadow-[0_0_0_4px_rgba(0,0,0,0.1)] bg-slate-100 dark:bg-slate-800 ${spinning ? 'animate-pulse-slow' : ''}`}
           animate={{ rotate: rotation }}
           transition={{ duration: 5.2, ease: 'easeOut' }}
+          style={{ pointerEvents: 'all' }}
         >
           {/* Borde interno decorativo */}
             <div className="absolute inset-2 rounded-full border-[3px] border-white/40 z-10"></div>
@@ -205,6 +208,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
             <button
               onClick={spin}
               disabled={spinning || disabled}
+              style={{zIndex: 30, pointerEvents: 'auto'}}
               className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-20 w-20 rounded-full font-bold text-sm tracking-wide flex flex-col items-center justify-center transition-all shadow-lg border-4 border-white/60 
                ${spinning || disabled ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-fiesta-purple hover:scale-110 hover:rotate-1 active:scale-95 text-white'}`}
             >
