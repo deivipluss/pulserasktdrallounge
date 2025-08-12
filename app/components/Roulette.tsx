@@ -252,14 +252,16 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
               <div
                 key={`divider-${i}`}
                 className="absolute left-1/2 top-1/2"
-                style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }}
+                style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)`, transformOrigin: '50% 50%' }}
               >
                 <div
-                  className="bg-white/90"
+                  className="absolute bg-white/90"
                   style={{
+                    left: '50%',
+                    top: '50%',
                     width: '1.5px',
                     height: px(radius * 0.92),
-                    transform: 'translateY(-100%)',
+                    transform: 'translate(-50%, -100%)',
                     transformOrigin: 'center bottom',
                   }}
                 />
