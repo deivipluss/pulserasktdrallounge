@@ -27,7 +27,7 @@ const WRISTBAND = {
     OFFSET_LEFT_PX: 1538, // Posición exacta desde la izquierda según el segundo pantallazo
     WIDTH_PX: 76,        // Ancho exacto del área del QR según el segundo pantallazo
     HEIGHT_PX: 76,       // Alto exacto del área del QR según el segundo pantallazo
-    QR_SIZE_PX: 85,      // QR más grande que el área para asegurar que ocupe todo el espacio blanco
+    QR_SIZE_PX: 76,      // El QR debe ser del mismo tamaño que el área blanca para encajar perfectamente
     ID_OFFSET_Y: 86.1,   // Posición Y donde va el texto ID-1234 (justo debajo del QR)
   },
   // Mantenemos las medidas en MM para compatibilidad
@@ -39,15 +39,15 @@ const WRISTBAND = {
 const DEFAULT_PRESET = {
   dpi: 300, // DPI según el valor detectado en la imagen (300.00097895252077)
   qrArea: {
-    // Valores exactos según el JSON de calibración
-    x: 1500, // Posición X ajustada según el JSON
-    y: 100, // Posición Y desde arriba para centrar verticalmente
-    w: 76, // Ancho del área según JSON
-    h: 76, // Alto del área según JSON
+    // Valores exactos según el pantallazo de referencia
+    x: 1538, // Posición X exacta desde la izquierda según pantallazo
+    y: 161, // Posición Y calculada para centrar verticalmente (398-76)/2 = 161px
+    w: 76, // Ancho del área según pantallazo
+    h: 76, // Alto del área según pantallazo
     rotation: 0
   },
-  qrSizePx: 85, // Tamaño QR en píxeles, ajustado para llenar el espacio
-  idLabel: { enabled: true, dy: 130, fontPx: 28, align: 'center' }, // Ajustado según imagen para que quede por debajo del QR
+  qrSizePx: 76, // Tamaño QR igual al tamaño del área blanca para encajar perfectamente
+  idLabel: { enabled: true, dy: 86.1, fontPx: 18, align: 'center' }, // Exactamente 86.1px debajo del QR según el pantallazo
 };
 
 // Utilidades de conversión y detección DPI
@@ -193,14 +193,14 @@ export default function ImprimirPulserasPage() {
     // Calcular la escala proporcional
     const escala = templateImg.width / WRISTBAND.WIDTH_PX;
     
-    // Aplicar escala a las dimensiones usando los valores del preset
+    // Aplicar escala a las dimensiones usando los valores exactos del preset
     const areaX = preset.qrArea.x * escala;
-    const areaY = preset.qrArea.y * escala;
+    const areaY = (WRISTBAND.HEIGHT_PX - WRISTBAND.QR_AREA.HEIGHT_PX) / 2 * escala; // Centrado vertical
     const areaW = preset.qrArea.w * escala;
     const areaH = preset.qrArea.h * escala;
     
-    // Tamaño del QR para que ocupe todo el área blanca
-    const qrMargin = 0; // Sin margen para maximizar tamaño
+    // Tamaño del QR exactamente igual al área blanca para encajar perfectamente
+    const qrMargin = 0; // Sin margen 
     const qrPx = preset.qrSizePx * escala;
     
     // Dibuja un área blanca del tamaño exacto según referencia
@@ -232,9 +232,9 @@ export default function ImprimirPulserasPage() {
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#222222';
         
-        // Posición del ID debajo del área blanca según la configuración
+        // Posición del ID debajo del área blanca según la medida exacta del pantallazo (86.1px)
         const labelX = areaX + areaW / 2;
-        const labelY = areaY + (preset.idLabel.dy * escala / 6); // Ajustado según dy
+        const labelY = areaY + areaH + 5 * escala; // Pequeño espacio debajo del QR
         ctx.fillText(id, labelX, labelY);
         ctx.restore();
       }
