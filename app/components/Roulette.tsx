@@ -250,11 +250,11 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           {/* Borde interno decorativo */}
           <div className="absolute inset-8 rounded-full border-[3px] border-white/50 z-11 bg-white/5 backdrop-blur-[1px]"></div>
 
-          {/* Etiquetas de premios */}
+          {/* Etiquetas de premios - colocadas cerca del borde exterior */}
           {rewards.map((reward, index) => {
             const angle = 360 / rewards.length;
             const rotationAngle = index * angle + (angle / 2);
-            const textRadius = '65%'; // Aumentamos significativamente la distancia para alejarla del centro
+            const textRadius = '85%'; // Mucho más cerca del borde exterior
 
             return (
               <div
@@ -268,10 +268,20 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                 <div 
                   className="flex flex-col items-center justify-center"
                   style={{
-                    transform: `rotate(${180 - rotationAngle}deg)` // Orientación radial perfecta para cada segmento
+                    transform: `rotate(${rotationAngle < 180 ? 180 - rotationAngle : 540 - rotationAngle}deg)` // Orientación alineada con cada sección
                   }}
                 >
-                  <div className="text-xl mb-1" style={{ textShadow: '0 0 5px rgba(0,0,0,0.5)'}}>
+                  <span
+                    className="font-bold text-xs uppercase tracking-wider text-center w-16 leading-none"
+                    style={{
+                      color: reward.textColor || '#fff',
+                      textShadow: '0px 1px 3px rgba(0,0,0,0.7)',
+                    }}
+                  >
+                    {reward.name}
+                  </span>
+                  
+                  <div className="text-lg mt-1" style={{ textShadow: '0 0 5px rgba(0,0,0,0.5)'}}>
                     {reward.id === 1 && <span>🍬</span>}
                     {reward.id === 2 && <span>🚬</span>}
                     {reward.id === 3 && <span>🧠</span>}
@@ -280,15 +290,6 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                     {reward.id === 6 && <span>🍭</span>}
                     {reward.id === 7 && <span>↺</span>}
                   </div>
-                  <span
-                    className="font-bold text-xs uppercase tracking-wider text-center w-20"
-                    style={{
-                      color: reward.textColor || '#fff',
-                      textShadow: '0px 1px 3px rgba(0,0,0,0.7)',
-                    }}
-                  >
-                    {reward.name}
-                  </span>
                 </div>
               </div>
             );
