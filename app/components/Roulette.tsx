@@ -198,10 +198,10 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
     const angle = (360 / rewards.length);
     const rotate = index * angle;
     const textAngle = -rotate - (angle/2);
-    const labelRadius = 40; // % desde centro
     
     // Calculamos la posición del texto en coordenadas polares
-    const textRadiusPercent = 64; // distancia desde el centro (0-100%)
+    // Ajustamos para que esté más cerca del borde pero aún visible
+    const textRadiusPercent = 68; // distancia desde el centro (0-100%) 
     const textRotateRad = ((rotate + angle/2) * Math.PI) / 180;
     const textX = 50 + textRadiusPercent * Math.cos(textRotateRad);
     const textY = 50 + textRadiusPercent * Math.sin(textRotateRad);
@@ -214,19 +214,33 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           top: `${textY}%`,
           left: `${textX}%`,
           transform: `translate(-50%, -50%) rotate(${textAngle}deg)`,
-          width: '80px',
-          height: '20px',
-          zIndex: 15
+          width: '100px',
+          height: 'auto',
+          zIndex: 20
         }}
       >
         <div
-          className={`text-center font-bold text-[10px] sm:text-xs md:text-sm drop-shadow-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
+          className={`text-center font-bold text-xs sm:text-sm md:text-base drop-shadow-md px-2 py-1 rounded-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
           style={{
             color: reward.textColor || '#fff',
-            textShadow: '0px 1px 2px rgba(0,0,0,0.7)',
-            lineHeight: 1.1
+            background: 'rgba(0,0,0,0.5)',
+            textShadow: '0px 1px 2px rgba(0,0,0,0.9)',
+            lineHeight: 1.2,
+            border: '1px solid rgba(255,255,255,0.4)',
+            backdropFilter: 'blur(1px)',
+            fontWeight: 800,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            whiteSpace: 'nowrap'
           }}
         >
+          {/* Iconos para cada premio */}
+          {reward.id === 1 && <span className="mr-1">🍬</span>}
+          {reward.id === 2 && <span className="mr-1">🚬</span>}
+          {reward.id === 3 && <span className="mr-1">🧠</span>}
+          {reward.id === 4 && <span className="mr-1">🍿</span>}
+          {reward.id === 5 && <span className="mr-1">💧</span>}
+          {reward.id === 6 && <span className="mr-1">🍭</span>}
+          {reward.id === 7 && <span className="mr-1">↺</span>}
           {reward.name}
         </div>
       </div>
@@ -234,8 +248,8 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
   });
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-80 h-80 sm:w-[26rem] sm:h-[26rem] mb-10 select-none" style={{ touchAction: 'manipulation' }}>
+    <div className="flex flex-col items-center max-w-full px-4">
+      <div className="relative w-[90vw] h-[90vw] max-w-[28rem] max-h-[28rem] min-w-[280px] min-h-[280px] mb-10 select-none" style={{ touchAction: 'manipulation' }}>
         {/* Marcador superior */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-[20%] z-20">
           <div className="relative w-[30px] h-[45px] flex items-center justify-center">
@@ -261,21 +275,28 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
             boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)'
           }}
         >
+          {/* Círculo exterior decorativo */}
+          <div className="absolute inset-0 rounded-full border-[8px] border-white/20 z-5"></div>
+        
           {/* Líneas divisorias entre segmentos */}
           {rewards.map((_, index) => {
             const rotate = index * segmentAngle;
             return (
               <div 
                 key={`line-${index}`}
-                className="absolute top-0 left-1/2 w-[2px] h-1/2 origin-bottom bg-white/30"
+                className="absolute top-0 left-1/2 w-[3px] h-1/2 origin-bottom"
                 style={{
                   transform: `translateX(-50%) rotate(${rotate}deg)`,
-                  boxShadow: '0 0 4px rgba(0,0,0,0.2)',
+                  background: 'rgba(255,255,255,0.6)',
+                  boxShadow: '0 0 5px rgba(0,0,0,0.3), 0 0 3px rgba(255,255,255,0.5)',
                   zIndex: 12
                 }}
               />
             );
           })}
+          
+          {/* Círculos decorativos para mayor realismo */}
+          <div className="absolute inset-[3%] rounded-full border-[1px] border-white/30 z-11"></div>
           
           {/* Borde interno decorativo */}
           <div className="absolute inset-8 rounded-full border-[3px] border-white/50 z-11 bg-white/5 backdrop-blur-[1px]"></div>
@@ -289,26 +310,29 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
               onClick={spin}
               disabled={spinning || disabled}
               style={{zIndex: 30, pointerEvents: 'auto'}}
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-24 w-24 rounded-full font-bold tracking-wide flex flex-col items-center justify-center transition-all shadow-lg border-4 
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-28 w-28 rounded-full font-bold tracking-wide flex flex-col items-center justify-center transition-all shadow-xl border-[6px] 
                ${spinning || disabled 
                 ? 'bg-gray-400 cursor-not-allowed text-white border-white/40' 
-                : 'bg-gradient-to-br from-fiesta-purple to-fiesta-pink hover:scale-110 hover:rotate-1 active:scale-95 text-white border-white/80'}`}
+                : 'bg-gradient-to-br from-fiesta-purple to-fiesta-pink hover:scale-110 hover:rotate-3 active:scale-95 text-white border-white/90'}`}
             >
-              <div className="absolute inset-1 rounded-full bg-gradient-to-tr from-white/40 via-transparent to-transparent pointer-events-none"></div>
+              {/* Efectos decorativos del botón */}
+              <div className="absolute inset-2 rounded-full bg-gradient-to-tr from-white/40 via-transparent to-transparent pointer-events-none"></div>
+              <div className="absolute inset-0 rounded-full border-2 border-white/30 animate-pulse-slow pointer-events-none"></div>
               
               {spinning ? (
                 <div className="flex flex-col items-center">
-                  <span className="text-base font-semibold">Girando</span>
+                  <span className="text-lg font-bold">GIRANDO</span>
                   <div className="mt-1 flex gap-1">
-                    <span className="animate-bounce delay-0">.</span>
-                    <span className="animate-bounce delay-100">.</span>
-                    <span className="animate-bounce delay-200">.</span>
+                    <span className="animate-bounce delay-0">•</span>
+                    <span className="animate-bounce delay-100">•</span>
+                    <span className="animate-bounce delay-200">•</span>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <span className="text-lg font-extrabold tracking-wider">GIRAR</span>
-                  <span className="text-xs opacity-90 mt-0.5">¡Buena Suerte!</span>
+                  <span className="text-xl font-extrabold tracking-widest">GIRAR</span>
+                  <div className="h-px w-3/4 bg-white/60 my-1"></div>
+                  <span className="text-xs opacity-90 mt-0.5">¡BUENA SUERTE!</span>
                 </div>
               )}
             </button>
