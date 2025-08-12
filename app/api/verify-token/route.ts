@@ -50,5 +50,16 @@ export async function GET(request: NextRequest) {
     ? new URL(redirect, request.url)
     : new URL('/' + redirect, request.url);
     
-  return NextResponse.redirect(finalRedirect);
+  const response = NextResponse.redirect(finalRedirect);
+  // Set cookie de validación (httpOnly false porque solo necesitamos loop-prevention; vida corta)
+  try {
+    const sigPrefix = sig.slice(0, 16);
+    response.cookies.set('tkv', `${id}:${sigPrefix}`, {
+      path: '/jugar',
+      maxAge: 60, // 1 minuto es suficiente para evitar loops inmediatos
+      httpOnly: false,
+      sameSite: 'lax',
+    });
+  } catch {}
+  return response;
 }
