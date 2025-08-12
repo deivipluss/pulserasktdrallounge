@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import Roulette from '@/app/components/Roulette';
+import RouletteUnified, { type Reward } from '@/app/components/Roulette';
 import { hasIdPlayed, markIdAsPlayed } from '@/app/lib/played-storage';
 import { getEventTZ, getTimeUntilEvent } from '@/app/lib/client-env';
 
@@ -30,7 +30,7 @@ function Play() {
   
   const [state, setState] = useState<PageState>(PageState.LOADING);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, hasStarted: false });
-  const [reward, setReward] = useState<any>(null);
+  const [reward, setReward] = useState<Reward | null>(null);
   
   // Verificar el estado al cargar
   useEffect(() => {
@@ -83,18 +83,19 @@ function Play() {
   }, [id]);
   
   // Manejar el resultado de la ruleta
-  const handleRouletteResult = (result: any) => {
+  const handleRouletteResult = (result: Reward) => {
     setReward(result);
     // Si es un resultado de reintento no consumimos la pulsera
-    if (!result?.retry) {
+    if (!result.retry) {
       markIdAsPlayed(id);
+      // Mostrar panel de premio unos segundos antes de pasar a PLAYED
       setTimeout(() => {
         setState(PageState.PLAYED);
       }, 2500);
     } else {
-      // Permitir seguir jugando inmediatamente
+      // Resultado de "Nuevo intento": limpiamos para permitir siguiente giro
       setTimeout(() => {
-        setReward(null); // limpia panel para próxima tirada
+        setReward(null);
       }, 1500);
     }
   };
@@ -165,7 +166,29 @@ function Play() {
               ¡Gira la ruleta y gana!
             </h1>
             
-            <Roulette onResult={handleRouletteResult} />
+            <RouletteUnified onResult={handleRouletteResult} />
+
+            {/* Panel flotante temporal con el resultado mientras sigue en READY_TO_PLAY */}
+            {reward && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="mt-6 rounded-token bg-gradient-to-br from-fiesta-purple/10 via-fiesta-pink/10 to-fiesta-orange/10 border border-white/20 dark:border-white/10 p-4 text-center backdrop-blur-sm"
+              >
+                {reward.retry ? (
+                  <div>
+                    <p className="text-fluid-lg font-semibold mb-1">¡Nuevo intento!</p>
+                    <p className="text-fluid-sm opacity-80">Vuelve a girar, esta vez aseguras un premio 🎯</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-fluid-sm opacity-75 mb-1">Has ganado</p>
+                    <p className="text-fluid-2xl font-heading font-bold">{reward.name}</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
           </motion.div>
         )}
         
