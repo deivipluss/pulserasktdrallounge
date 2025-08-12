@@ -46,7 +46,7 @@ const DEFAULT_PRESET = {
     h: 76, // Alto del área según pantallazo
     rotation: 0
   },
-  qrSizePx: 76, // Tamaño QR igual al tamaño del área blanca para encajar perfectamente
+  qrSizePx: 78, // Ligeramente mayor que el área blanca para asegurar que la llene completamente
   idLabel: { enabled: true, dy: 86.1, fontPx: 18, align: 'center' }, // Exactamente 86.1px debajo del QR según el pantallazo
 };
 
@@ -199,9 +199,10 @@ export default function ImprimirPulserasPage() {
     const areaW = preset.qrArea.w * escala;
     const areaH = preset.qrArea.h * escala;
     
-    // Tamaño del QR exactamente igual al área blanca para encajar perfectamente
-    const qrMargin = 0; // Sin margen 
-    const qrPx = preset.qrSizePx * escala;
+    // Tamaño del QR ligeramente más grande que el área blanca para asegurar que llene completamente
+    const qrMargin = 0; // Eliminamos completamente el margen
+    // Incrementamos un poco el tamaño para asegurar que cubra completamente el área
+    const qrPx = Math.ceil(preset.qrSizePx * escala);
     
     // Dibuja un área blanca del tamaño exacto según referencia
     ctx.save();
@@ -213,30 +214,34 @@ export default function ImprimirPulserasPage() {
     ctx.restore();
     
     // Genera QR con nivel bajo de corrección de errores para maximizar tamaño
-    const qrOpts = { errorCorrectionLevel: 'L' as const, margin: qrMargin, width: qrPx };
+    // Aseguramos que el QR se genere con el tamaño exacto y sin márgenes
+    const qrOpts = { 
+      errorCorrectionLevel: 'L' as const, 
+      margin: 0,  // Forzamos sin margen
+      width: qrPx,
+      color: {
+        dark: '#000000', // Color del QR
+        light: '#ffffff'  // Color del fondo del QR (transparente)
+      }
+    }; 
     const qrUrl: string = await QRCode.toDataURL(qrData, qrOpts);
     const qrImg = new window.Image();
     
     qrImg.onload = () => {
-      // Centra perfectamente el QR en el área blanca, con un pequeño ajuste para cubrir completamente el área
-      const cx = areaX + (areaW - qrPx) / 2;
-      const cy = areaY + (areaH - qrPx) / 2;
+      // Centra perfectamente el QR en el área blanca, asegurando que ocupe completamente el espacio
+      // Calculamos exactamente el centro del área blanca
+      const cx = Math.floor(areaX + (areaW - qrPx) / 2);
+      const cy = Math.floor(areaY + (areaH - qrPx) / 2);
+      
+      // Dibujamos el QR exactamente en el tamaño del área blanca
       ctx.drawImage(qrImg, cx, cy, qrPx, qrPx);
       
-      // Dibuja el ID debajo del área blanca
-      if (preset.idLabel?.enabled) {
-        const fontPx = preset.idLabel.fontPx * escala; // Usar tamaño definido en el preset
-        ctx.save();
-        ctx.font = `bold ${fontPx}px sans-serif`;
-        ctx.textAlign = (preset.idLabel.align || 'center') as CanvasTextAlign;
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = '#222222';
-        
-        // Posición del ID debajo del área blanca según la medida exacta del pantallazo (86.1px)
-        const labelX = areaX + areaW / 2;
-        const labelY = areaY + areaH + 5 * escala; // Pequeño espacio debajo del QR
-        ctx.fillText(id, labelX, labelY);
-        ctx.restore();
+      // Como mencionaste que el ID no es tan importante, lo omitimos
+      // para evitar cualquier conflicto con el QR
+      if (preset.idLabel?.enabled) { 
+        // ID deshabilitado para asegurar que el QR se muestre correctamente
+        // Si necesitas restaurar esto, quita este comentario y restaura el código
+        // console.log("ID omitido para evitar conflictos con el QR");
       }
     };
     
@@ -307,14 +312,16 @@ export default function ImprimirPulserasPage() {
       // Renderiza pulsera
       await renderPreview(rows[i].url, rows[i].id);
       
-      // Importante: esperar a que el QR se renderice completamente
+      // Aumentamos el tiempo de espera para asegurar que el QR se renderice completamente
       // La generación del QR es asíncrona pero no devuelve una promesa
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const canvas = canvasRef.current;
       if (!canvas) continue;
       
-      const pngBytes = await fetch(canvas.toDataURL('image/png')).then(r => r.arrayBuffer());
+      // Aseguramos que capturamos la imagen con calidad máxima
+      const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+      const pngBytes = await fetch(pngDataUrl).then(r => r.arrayBuffer());
       const img = await pdfDoc.embedPng(pngBytes);
       const x = Number(col * cellW + bleedPx);
       const y = Number(pdfH - ((row + 1) * cellH) + bleedPx);
