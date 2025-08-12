@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Dropzone, { DropzoneOptions, FileRejection } from 'react-dropzone';
+import Dropzone, { FileRejection } from 'react-dropzone';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
 import { PDFDocument, rgb } from 'pdf-lib';
@@ -19,65 +19,41 @@ import {
   Upload
 } from 'lucide-react';
 
-// CONSTANTES DE LA PULSERA
+// CONSTANTES DE LA PULSERA (Fuente única de verdad)
 const WRISTBAND = {
-  WIDTH_PX: 2413,  // Ancho total de la pulsera en píxeles (del pantallazo)
-  HEIGHT_PX: 398,  // Alto de la pulsera en píxeles (del pantallazo)
+  WIDTH_PX: 2413,
+  HEIGHT_PX: 398,
   QR_AREA: {
-    OFFSET_LEFT_PX: 1538, // Posición exacta desde la izquierda según el segundo pantallazo
-    WIDTH_PX: 76,        // Ancho exacto del área del QR según el segundo pantallazo
-    HEIGHT_PX: 76,       // Alto exacto del área del QR según el segundo pantallazo
-    QR_SIZE_PX: 76,      // El QR debe ser del mismo tamaño que el área blanca para encajar perfectamente
-    ID_OFFSET_Y: 86.1,   // Posición Y donde va el texto ID-1234 (justo debajo del QR)
+    OFFSET_LEFT_PX: 1538,
+    WIDTH_PX: 234,
+    HEIGHT_PX: 234,
+    BOTTOM_MARGIN_PX: 86.1,
   },
-  // Mantenemos las medidas en MM para compatibilidad
   WIDTH_MM: 204.3,
   HEIGHT_MM: 33.69
 };
 
-// Preset de calibración por defecto, actualizado con las medidas exactas
+// Preset de calibración por defecto, calculado a partir de las constantes
 const DEFAULT_PRESET = {
-  dpi: 300, // DPI según el valor detectado en la imagen (300.00097895252077)
+  dpi: 300,
   qrArea: {
-    // Valores exactos según el pantallazo de referencia
-    x: 1538, // Posición X exacta desde la izquierda según pantallazo
-    y: 161, // Posición Y calculada para centrar verticalmente (398-76)/2 = 161px
-    w: 76, // Ancho del área según pantallazo
-    h: 76, // Alto del área según pantallazo
+    x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX,
+    y: WRISTBAND.HEIGHT_PX - WRISTBAND.QR_AREA.BOTTOM_MARGIN_PX - WRISTBAND.QR_AREA.HEIGHT_PX, // 398 - 86.1 - 76 = 235.9
+    w: WRISTBAND.QR_AREA.WIDTH_PX,
+    h: WRISTBAND.QR_AREA.HEIGHT_PX,
     rotation: 0
   },
-  qrSizePx: 78, // Ligeramente mayor que el área blanca para asegurar que la llene completamente
-  idLabel: { enabled: true, dy: 86.1, fontPx: 18, align: 'center' }, // Exactamente 86.1px debajo del QR según el pantallazo
+  qrSizePx: WRISTBAND.QR_AREA.WIDTH_PX,
+  idLabel: { enabled: false, dy: 0, fontPx: 18, align: 'center' }, // ID deshabilitado
 };
 
-// Utilidades de conversión y detección DPI
+// Utilidades
 function detectDpiFromTemplate(imgWidthPx: number): number {
   return imgWidthPx / (WRISTBAND.WIDTH_MM / 25.4);
 }
 
 function mmToPx(mm: number, dpi: number): number {
   return mm * dpi / 25.4;
-}
-
-function pxToMm(px: number, dpi: number): number {
-  return px * 25.4 / dpi;
-}
-
-// Calcula las coordenadas exactas del QR según la imagen real
-function calculateQrAreaPx(templateWidth: number) {
-  // Calculamos la escala entre la plantilla original y la cargada por el usuario
-  const escala = templateWidth / WRISTBAND.WIDTH_PX;
-  
-  // Calculamos la posición centrada del QR
-  const x = (WRISTBAND.QR_AREA.OFFSET_LEFT_PX - WRISTBAND.QR_AREA.WIDTH_PX / 2) * escala; // Posición izquierda del área
-  const y = 100 * escala; // Posición desde arriba ajustada para centrar verticalmente
-  
-  return {
-    x,
-    y,
-    w: WRISTBAND.QR_AREA.WIDTH_PX * escala,
-    h: WRISTBAND.QR_AREA.HEIGHT_PX * escala,
-  };
 }
 
 export default function ImprimirPulserasPage() {
@@ -95,38 +71,24 @@ export default function ImprimirPulserasPage() {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Actualiza el preset cuando se carga la imagen
   useEffect(() => {
     if (templateImg) {
       const dpi = detectDpiFromTemplate(templateImg.width);
-      const qrArea = calculateQrAreaPx(templateImg.width);
-      
-      setPreset(prev => ({
-        ...prev,
-        dpi,
-        qrArea: {
-          ...prev.qrArea,
-          x: qrArea.x,
-          y: qrArea.y,
-          w: qrArea.w,
-          h: qrArea.h
-        }
-      }));
-
-      // Renderiza una vista previa
-      renderPreview('https://ejemplo.com/qr-demo', 'ID-1234');
-      
-      // Cambia a la pestaña de vista previa
-      setActiveTab('preview');
-      
-      setStatus({
-        type: 'success',
-        message: 'Plantilla cargada correctamente. QR posicionado según medidas proporcionadas.'
-      });
+      setPreset(prev => ({ ...prev, dpi }));
     }
   }, [templateImg]);
 
-  // Cargar imagen y obtener dimensiones
+  useEffect(() => {
+    if (templateImg) {
+      renderPreview('https://ejemplo.com/qr-demo', 'ID-1234');
+      setActiveTab('preview');
+      setStatus({
+        type: 'success',
+        message: 'Plantilla cargada. QR posicionado según medidas exactas.'
+      });
+    }
+  }, [templateImg, preset]);
+
   const handleTemplateFile = (file: File) => {
     setTemplateFile(file);
     const reader = new FileReader();
@@ -138,7 +100,6 @@ export default function ImprimirPulserasPage() {
     reader.readAsDataURL(file);
   };
   
-  // Procesar CSV
   const handleCsvFile = (file: File) => {
     setCsvFile(file);
     const reader = new FileReader();
@@ -146,208 +107,116 @@ export default function ImprimirPulserasPage() {
       try {
         const text = e.target?.result as string;
         const lines = text.split('\n').filter(l => l.trim());
-        // Omitir encabezado
         const header = lines[0].split(',');
         const idIndex = header.findIndex(h => /id/i.test(h));
-        const dayIndex = header.findIndex(h => /day|día|fecha/i.test(h));
         const urlIndex = header.findIndex(h => /url|link|qr/i.test(h));
         
-        if (idIndex === -1 || urlIndex === -1) {
-          throw new Error('El CSV debe contener columnas para ID y URL');
-        }
+        if (idIndex === -1 || urlIndex === -1) throw new Error('CSV debe tener columnas "id" y "url"');
         
         const rows = lines.slice(1).map(l => {
           const cols = l.split(',');
-          return {
-            id: cols[idIndex].trim(),
-            day: dayIndex > -1 ? cols[dayIndex].trim() : 'dia',
-            url: cols[urlIndex].trim()
-          };
+          return { id: cols[idIndex].trim(), url: cols[urlIndex].trim() };
         });
         
         setCsvRows(rows);
-        setStatus({
-          type: 'success',
-          message: `Se cargaron ${rows.length} registros del CSV correctamente.`
-        });
+        setStatus({ type: 'success', message: `Se cargaron ${rows.length} registros.` });
       } catch (err) {
-        setStatus({
-          type: 'error',
-          message: `Error al procesar el CSV: ${err instanceof Error ? err.message : String(err)}`
-        });
+        setStatus({ type: 'error', message: `Error en CSV: ${err instanceof Error ? err.message : String(err)}` });
       }
     };
     reader.readAsText(file);
   };
 
-  // Renderiza QR sobre plantilla en canvas
-  async function renderPreview(qrData: string, id: string = 'ID-1234') {
+  async function renderPreview(qrData: string, id: string) {
     if (!templateImg || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
-    
-    // Limpia el canvas y dibuja la plantilla
+
     ctx.clearRect(0, 0, templateImg.width, templateImg.height);
     ctx.drawImage(templateImg, 0, 0);
     
-    // Calcular la escala proporcional
-    const escala = templateImg.width / WRISTBAND.WIDTH_PX;
+    const areaX = preset.qrArea.x;
+    const areaY = preset.qrArea.y;
+    const areaW = preset.qrArea.w;
+    const areaH = preset.qrArea.h;
     
-    // Aplicar escala a las dimensiones usando los valores exactos del preset
-    const areaX = preset.qrArea.x * escala;
-    const areaY = (WRISTBAND.HEIGHT_PX - WRISTBAND.QR_AREA.HEIGHT_PX) / 2 * escala; // Centrado vertical
-    const areaW = preset.qrArea.w * escala;
-    const areaH = preset.qrArea.h * escala;
+    const qrUrl = await QRCode.toDataURL(qrData, { 
+      errorCorrectionLevel: 'L', 
+      margin: 1,
+      width: areaW,
+      color: { dark: '#000000', light: '#ffffff' }
+    });
     
-    // Tamaño del QR ligeramente más grande que el área blanca para asegurar que llene completamente
-    const qrMargin = 0; // Eliminamos completamente el margen
-    // Incrementamos un poco el tamaño para asegurar que cubra completamente el área
-    const qrPx = Math.ceil(preset.qrSizePx * escala);
-    
-    // Dibuja un área blanca del tamaño exacto según referencia
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(areaX, areaY, areaW, areaH); // Rectángulo blanco exacto según referencia
-    ctx.closePath();
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.restore();
-    
-    // Genera QR con nivel bajo de corrección de errores para maximizar tamaño
-    // Aseguramos que el QR se genere con el tamaño exacto y sin márgenes
-    const qrOpts = { 
-      errorCorrectionLevel: 'L' as const, 
-      margin: 0,  // Forzamos sin margen
-      width: qrPx,
-      color: {
-        dark: '#000000', // Color del QR
-        light: '#ffffff'  // Color del fondo del QR (transparente)
-      }
-    }; 
-    const qrUrl: string = await QRCode.toDataURL(qrData, qrOpts);
     const qrImg = new window.Image();
-    
     qrImg.onload = () => {
-      // Centra perfectamente el QR en el área blanca, asegurando que ocupe completamente el espacio
-      // Calculamos exactamente el centro del área blanca
-      const cx = Math.floor(areaX + (areaW - qrPx) / 2);
-      const cy = Math.floor(areaY + (areaH - qrPx) / 2);
-      
-      // Dibujamos el QR exactamente en el tamaño del área blanca
-      ctx.drawImage(qrImg, cx, cy, qrPx, qrPx);
-      
-      // Como mencionaste que el ID no es tan importante, lo omitimos
-      // para evitar cualquier conflicto con el QR
-      if (preset.idLabel?.enabled) { 
-        // ID deshabilitado para asegurar que el QR se muestre correctamente
-        // Si necesitas restaurar esto, quita este comentario y restaura el código
-        // console.log("ID omitido para evitar conflictos con el QR");
-      }
+      ctx.drawImage(qrImg, areaX, areaY, areaW, areaH);
     };
-    
     qrImg.src = qrUrl;
-  }
-
-  // Exporta ZIP con PNGs y PDF de imposición
-  async function exportZipAndPdf(rows: Array<{id: string, day: string, url: string}>) {
+  }  async function exportZipAndPdf(rows: Array<{id: string, url: string}>) {
     if (!templateImg) return;
     
     setLoading(true);
-    setStatus({
-      type: 'info',
-      message: 'Generando archivos para impresión...'
-    });
+    setStatus({ type: 'info', message: 'Generando archivos...' });
     
     const zip = new JSZip();
     
     try {
-      // Renderiza cada pulsera y agrega al ZIP
       for (const row of rows) {
         await renderPreview(row.url, row.id);
         const canvas = canvasRef.current;
         if (!canvas) continue;
         const png = canvas.toDataURL('image/png');
-        const data = png.split(',')[1];
-        zip.file(`pulsera_${row.day}_${row.id}.png`, data, {base64: true});
+        zip.file(`pulsera_${row.id}.png`, png.split(',')[1], { base64: true });
       }
       
-      // PDF de imposición
       const pdf = await composeImpositionPdf(rows);
       const pdfBytes = await pdf.save();
       zip.file('imposicion.pdf', pdfBytes);
       
-      const blob = await zip.generateAsync({type:'blob'});
+      const blob = await zip.generateAsync({ type: 'blob' });
       setZipBlob(blob);
-      
-      setStatus({
-        type: 'success',
-        message: 'Archivos generados correctamente. Listo para descargar.'
-      });
+      setStatus({ type: 'success', message: 'Archivos listos para descargar.' });
     } catch (err) {
-      setStatus({
-        type: 'error',
-        message: `Error al generar los archivos: ${err instanceof Error ? err.message : String(err)}`
-      });
+      setStatus({ type: 'error', message: `Error al generar: ${err instanceof Error ? err.message : String(err)}` });
     } finally {
       setLoading(false);
     }
   }
 
-  // Composición de PDF de imposición (A4/A3 configurable)
-  async function composeImpositionPdf(rows: Array<{id: string, day: string, url: string}>, config = {paper: 'A4', cols: 2, rows: 6, bleedMm: 2}) {
-    // Medidas papel en mm
-    const paperSizes = {A4: {w: 210, h: 297}, A3: {w: 297, h: 420}};
-    const paperKey = (typeof config.paper === 'string' && ['A4','A3'].includes(config.paper)) ? config.paper : 'A4';
-    const paper = paperKey === 'A3' ? paperSizes.A3 : paperSizes.A4;
+  async function composeImpositionPdf(rows: Array<{id: string, url: string}>, config = { paper: 'A4', cols: 2, rows: 6, bleedMm: 2 }) {
+    const paperSizes = { A4: { w: 210, h: 297 }, A3: { w: 297, h: 420 } };
+    const paper = config.paper === 'A3' ? paperSizes.A3 : paperSizes.A4;
     const dpi = preset.dpi;
     const bleedPx = Math.round(mmToPx(config.bleedMm, dpi));
-    const cellW = Number(templateImg?.width ?? 0) + 2 * bleedPx;
-    const cellH = Number(templateImg?.height ?? 0) + 2 * bleedPx;
+    const cellW = (templateImg?.width ?? 0) + 2 * bleedPx;
+    const cellH = (templateImg?.height ?? 0) + 2 * bleedPx;
     const pdfW = Math.round(mmToPx(paper.w, dpi));
     const pdfH = Math.round(mmToPx(paper.h, dpi));
+    
     const pdfDoc = await PDFDocument.create();
     let page = pdfDoc.addPage([pdfW, pdfH]);
     let col = 0, row = 0;
+
     for (let i = 0; i < rows.length; i++) {
-      // Renderiza pulsera
       await renderPreview(rows[i].url, rows[i].id);
-      
-      // Aumentamos el tiempo de espera para asegurar que el QR se renderice completamente
-      // La generación del QR es asíncrona pero no devuelve una promesa
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 50)); // Espera para renderizado
       
       const canvas = canvasRef.current;
       if (!canvas) continue;
       
-      // Aseguramos que capturamos la imagen con calidad máxima
-      const pngDataUrl = canvas.toDataURL('image/png', 1.0);
-      const pngBytes = await fetch(pngDataUrl).then(r => r.arrayBuffer());
+      const pngBytes = await fetch(canvas.toDataURL('image/png', 1.0)).then(r => r.arrayBuffer());
       const img = await pdfDoc.embedPng(pngBytes);
-      const x = Number(col * cellW + bleedPx);
-      const y = Number(pdfH - ((row + 1) * cellH) + bleedPx);
-      page.drawImage(img, {
-        x,
-        y,
-        width: Number(templateImg?.width ?? 0),
-        height: Number(templateImg?.height ?? 0)
-      });
-      // Marcas de corte
-      page.drawLine({
-        start: {x: Number(col * cellW), y: Number(pdfH - row * cellH)},
-        end: {x: Number((col+1)*cellW), y: Number(pdfH - row * cellH)},
-        color: rgb(0,0,0), thickness: 0.5
-      });
-      page.drawLine({
-        start: {x: Number(col * cellW), y: Number(pdfH - row * cellH)},
-        end: {x: Number(col*cellW), y: Number(pdfH - (row+1)*cellH)},
-        color: rgb(0,0,0), thickness: 0.5
-      });
-      // Siguiente celda
+      
+      const x = col * cellW + bleedPx;
+      const y = pdfH - ((row + 1) * cellH) + bleedPx;
+      
+      page.drawImage(img, { x, y, width: templateImg?.width ?? 0, height: templateImg?.height ?? 0 });
+      
       col++;
       if (col >= config.cols) {
         col = 0;
         row++;
-        if (row >= config.rows) {
+        if (row >= config.rows && i < rows.length - 1) {
           row = 0;
           page = pdfDoc.addPage([pdfW, pdfH]);
         }
@@ -361,23 +230,18 @@ export default function ImprimirPulserasPage() {
       <div className="container mx-auto p-6">
         <motion.h1 
           className="text-3xl font-bold mb-2 text-gradient"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
         >
           Generador de Pulseras QR
         </motion.h1>
         
         <motion.p 
           className="text-gray-300 mb-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }}
         >
-          Sube una plantilla de pulsera y un CSV de datos para generar pulseras personalizadas con códigos QR.
+          Sube una plantilla PNG y un archivo CSV para generar pulseras con QR.
         </motion.p>
         
-        {/* Barra de estado */}
         {status.type && (
           <motion.div 
             className={`mb-6 p-4 rounded-lg flex items-center ${
@@ -385,327 +249,113 @@ export default function ImprimirPulserasPage() {
               status.type === 'error' ? 'bg-red-800/50 border border-red-500/30' :
               'bg-blue-800/50 border border-blue-500/30'
             }`}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
           >
             <div className="mr-3">
-              {status.type === 'success' ? (
-                <Check className="w-5 h-5 text-green-400" />
-              ) : status.type === 'error' ? (
-                <AlertCircle className="w-5 h-5 text-red-400" />
-              ) : (
-                <PanelLeft className="w-5 h-5 text-blue-400" />
-              )}
+              {status.type === 'success' ? <Check className="w-5 h-5 text-green-400" /> :
+               status.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-400" /> :
+               <PanelLeft className="w-5 h-5 text-blue-400" />}
             </div>
             <p>{status.message}</p>
           </motion.div>
         )}
         
-        {/* Pestañas */}
         <div className="flex border-b border-gray-700 mb-6">
-          <button 
-            className={`px-4 py-2 ${activeTab === 'upload' ? 'text-fiesta-purple border-b-2 border-fiesta-purple' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('upload')}
-          >
-            <div className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              <span>Cargar Archivos</span>
-            </div>
-          </button>
-          <button 
-            className={`px-4 py-2 ${activeTab === 'preview' ? 'text-fiesta-purple border-b-2 border-fiesta-purple' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('preview')}
-            disabled={!templateImg}
-          >
-            <div className="flex items-center gap-2">
-              <QrCode className="w-4 h-4" />
-              <span>Vista Previa</span>
-            </div>
-          </button>
-          <button 
-            className={`px-4 py-2 ${activeTab === 'calibration' ? 'text-fiesta-purple border-b-2 border-fiesta-purple' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('calibration')}
-          >
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              <span>Calibración</span>
-            </div>
-          </button>
+          {['upload', 'preview', 'calibration'].map((tabName, index) => (
+            <button 
+              key={tabName}
+              className={`px-4 py-2 flex items-center gap-2 ${activeTab === tabName ? 'text-fiesta-purple border-b-2 border-fiesta-purple' : 'text-gray-400'}`}
+              onClick={() => setActiveTab(tabName as any)}
+              disabled={tabName !== 'upload' && !templateImg}
+            >
+              {index === 0 && <Upload className="w-4 h-4" />}
+              {index === 1 && <QrCode className="w-4 h-4" />}
+              {index === 2 && <Settings className="w-4 h-4" />}
+              <span>{tabName.charAt(0).toUpperCase() + tabName.slice(1)}</span>
+            </button>
+          ))}
         </div>
         
-        {/* Contenido por pestañas */}
         <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-          {/* Cargar archivos */}
           {activeTab === 'upload' && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-6"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
                   <FileImage className="w-5 h-5 text-fiesta-purple" />
-                  <span>Plantilla de Pulsera</span>
+                  <span>1. Plantilla de Pulsera (.png)</span>
                 </h2>
-                <Dropzone 
-                  accept={{'image/png': ['.png']}} 
-                  onDrop={(files: File[], _: FileRejection[]) => handleTemplateFile(files[0])} 
-                  multiple={false}
-                >
+                <Dropzone accept={{'image/png': ['.png']}} onDrop={([file]) => handleTemplateFile(file)} multiple={false}>
                   {({getRootProps, getInputProps}) => (
-                    <div 
-                      {...getRootProps()} 
-                      className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer transition-all hover:border-fiesta-purple"
-                    >
+                    <div {...getRootProps()} className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-fiesta-purple">
                       <input {...getInputProps()} />
                       {templateFile ? (
-                        <div className="flex flex-col items-center">
-                          <div className="w-64 h-32 bg-gray-800 rounded-lg overflow-hidden mb-3">
-                            <img 
-                              src={URL.createObjectURL(templateFile)} 
-                              alt="Vista previa" 
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                          <span className="text-green-400 font-medium">{templateFile.name}</span>
-                          <span className="text-xs text-gray-400 mt-1">Haz clic para cambiar</span>
-                        </div>
+                        <p className="text-green-400">{templateFile.name}</p>
                       ) : (
-                        <div className="py-8">
-                          <Upload className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-                          <p className="text-gray-300">Arrastra o haz clic para seleccionar la plantilla PNG</p>
-                          <p className="text-xs text-gray-500 mt-2">Formato recomendado: 4820 x 795 px (204.3 x 33.69 mm @ 600dpi)</p>
-                        </div>
+                        <p>Arrastra o haz clic para seleccionar la plantilla</p>
                       )}
                     </div>
                   )}
                 </Dropzone>
-                {templateImg && (
-                  <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                    <div className="bg-gray-800/50 p-3 rounded-lg">
-                      <div className="flex items-center mb-1">
-                        <Ruler className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-gray-300">Dimensiones:</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 text-gray-400">
-                        <div>Ancho: <span className="text-white">{templateImg.width} px</span></div>
-                        <div>Alto: <span className="text-white">{templateImg.height} px</span></div>
-                        <div>Ancho: <span className="text-white">{WRISTBAND.WIDTH_MM} mm</span></div>
-                        <div>Alto: <span className="text-white">{WRISTBAND.HEIGHT_MM} mm</span></div>
-                      </div>
-                    </div>
-                    <div className="bg-gray-800/50 p-3 rounded-lg">
-                      <div className="flex items-center mb-1">
-                        <QrCode className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-gray-300">Posición QR:</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 text-gray-400">
-                        <div>DPI: <span className="text-white">{detectDpiFromTemplate(templateImg.width).toFixed(2)}</span></div>
-                        <div>QR: <span className="text-white">{preset.qrSizePx}px</span></div>
-                        <div>Área QR X: <span className="text-white">{Math.round(preset.qrArea.x)}px</span></div>
-                        <div>Área QR Y: <span className="text-white">{Math.round(preset.qrArea.y)}px</span></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
               
               <div>
                 <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
                   <FileDown className="w-5 h-5 text-fiesta-purple" />
-                  <span>Archivo CSV</span>
+                  <span>2. Archivo de Datos (.csv)</span>
                 </h2>
-                <Dropzone 
-                  accept={{'text/csv': ['.csv']}} 
-                  onDrop={(files: File[], _: FileRejection[]) => handleCsvFile(files[0])} 
-                  multiple={false}
-                >
+                <Dropzone accept={{'text/csv': ['.csv']}} onDrop={([file]) => handleCsvFile(file)} multiple={false}>
                   {({getRootProps, getInputProps}) => (
-                    <div 
-                      {...getRootProps()} 
-                      className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer transition-all hover:border-fiesta-purple"
-                    >
+                    <div {...getRootProps()} className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-fiesta-purple">
                       <input {...getInputProps()} />
                       {csvFile ? (
-                        <div className="flex flex-col items-center py-4">
-                          <FileDown className="w-8 h-8 text-fiesta-purple mb-2" />
-                          <span className="text-green-400 font-medium">{csvFile.name}</span>
-                          <span className="text-xs text-gray-400 mt-1">CSV con {csvRows.length} registros</span>
-                          <span className="text-xs text-gray-400">Haz clic para cambiar</span>
-                        </div>
+                        <p className="text-green-400">{csvFile.name}</p>
                       ) : (
-                        <div className="py-8">
-                          <FileDown className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-                          <p className="text-gray-300">Arrastra o haz clic para seleccionar el CSV de tokens</p>
-                          <p className="text-xs text-gray-500 mt-2">El archivo debe tener columnas para ID y URL</p>
-                        </div>
+                        <p>Arrastra o haz clic para seleccionar el CSV</p>
                       )}
                     </div>
                   )}
                 </Dropzone>
-                {csvRows.length > 0 && (
-                  <div className="mt-4 bg-gray-800/50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-300">{csvRows.length} registros cargados</span>
-                      <div className="text-xs text-gray-400">
-                        Ejemplo: <span className="bg-gray-700 px-2 py-1 rounded font-mono">{csvRows[0]?.id}</span> → <span className="bg-gray-700 px-2 py-1 rounded font-mono truncate max-w-xs inline-block">{csvRows[0]?.url}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </motion.div>
           )}
           
-          {/* Vista previa */}
           {activeTab === 'preview' && templateImg && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-6"
-            >
-              <div className="flex flex-col items-center">
-                <h2 className="text-xl font-semibold mb-4">Vista Previa del QR</h2>
-                
-                <div className="relative w-full overflow-auto bg-gray-800/50 rounded-lg p-4">
-                  <canvas 
-                    ref={canvasRef} 
-                    width={templateImg.width} 
-                    height={templateImg.height} 
-                    className="max-w-full mx-auto border border-gray-700 rounded-lg"
-                  />
-                  
-                  <div className="absolute top-2 right-2 bg-black/70 text-xs text-gray-300 px-2 py-1 rounded">
-                    {templateImg.width} x {templateImg.height} px
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-3 mt-6">
-                  <button
-                    className="px-4 py-2 bg-gradient-to-r from-fiesta-purple to-fiesta-blue text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
-                    onClick={() => renderPreview('https://ejemplo.com/qr-demo', 'ID-1234')}
-                    type="button"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    <span>Renderizar QR Demo</span>
-                  </button>
-                  
-                  {csvRows.length > 0 && (
-                    <button
-                      className="px-4 py-2 bg-gradient-to-r from-fiesta-teal to-fiesta-blue text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
-                      onClick={() => renderPreview(csvRows[0].url, csvRows[0].id)}
-                      type="button"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      <span>Renderizar Primer QR del CSV</span>
-                    </button>
-                  )}
-                  
-                  {templateImg && csvRows.length > 0 && (
-                    <button
-                      className="px-4 py-2 bg-gradient-to-r from-fiesta-blue to-fiesta-teal text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                      disabled={loading}
-                      onClick={() => exportZipAndPdf(csvRows)}
-                      type="button"
-                    >
-                      {loading ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Generando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-4 h-4" />
-                          <span>Generar ZIP + PDF</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                  
-                  {zipBlob && (
-                    <a
-                      href={URL.createObjectURL(zipBlob)}
-                      download="pulseras.zip"
-                      className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Descargar ZIP</span>
-                    </a>
-                  )}
-                </div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+              <h2 className="text-xl font-semibold">Vista Previa</h2>
+              <div className="flex justify-center bg-gray-800/50 p-4 rounded-lg">
+                <canvas ref={canvasRef} width={templateImg.width} height={templateImg.height} className="max-w-full h-auto" />
               </div>
+              <div className="flex justify-center">
+                <button 
+                  onClick={() => exportZipAndPdf(csvRows)} 
+                  disabled={!csvRows.length || loading}
+                  className="bg-fiesta-purple text-white font-bold py-2 px-6 rounded-lg hover:bg-opacity-80 disabled:bg-gray-600 flex items-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  {loading ? 'Generando...' : 'Exportar Archivos'}
+                </button>
+              </div>
+              {zipBlob && (
+                <div className="text-center mt-4">
+                  <a href={URL.createObjectURL(zipBlob)} download="pulseras.zip" className="text-green-400 underline">
+                    Descargar pulseras.zip
+                  </a>
+                </div>
+              )}
             </motion.div>
           )}
-          
-          {/* Calibración */}
+
           {activeTab === 'calibration' && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-6"
-            >
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Calibración Avanzada</h2>
-                
-                <div className="bg-gray-800/50 p-4 rounded-lg mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-200">Medidas de la pulsera</span>
-                    <div className="text-xs text-gray-400 bg-black/30 px-2 py-1 rounded">
-                      {WRISTBAND.WIDTH_MM} × {WRISTBAND.HEIGHT_MM} mm
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <h3 className="text-gray-300 mb-2">Posición del QR</h3>
-                      <div className="space-y-1 text-gray-400">
-                        <div>Distancia desde izquierda: <span className="text-white">{WRISTBAND.QR_AREA.OFFSET_LEFT_PX} px</span></div>
-                        <div>Posición X: <span className="text-white">{WRISTBAND.QR_AREA.OFFSET_LEFT_PX} px</span></div>
-                        <div>Tamaño área: <span className="text-white">{WRISTBAND.QR_AREA.WIDTH_PX}x{WRISTBAND.QR_AREA.HEIGHT_PX} px</span></div>
-                        <div>Tamaño del QR: <span className="text-white">{WRISTBAND.QR_AREA.QR_SIZE_PX} px</span></div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-gray-300 mb-2">Valores en Píxeles</h3>
-                      <div className="space-y-1 text-gray-400">
-                        {templateImg && (
-                          <>
-                            <div>DPI detectado: <span className="text-white">{detectDpiFromTemplate(templateImg.width).toFixed(2)}</span></div>
-                            <div>X: <span className="text-white">{preset.qrArea.x.toFixed(0)} px</span></div>
-                            <div>Y: <span className="text-white">{preset.qrArea.y.toFixed(0)} px</span></div>
-                            <div>Ancho: <span className="text-white">{preset.qrArea.w.toFixed(0)} px</span></div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <details className="bg-gray-800/30 rounded-lg p-4 text-sm">
-                  <summary className="cursor-pointer text-gray-300 font-medium">Editar JSON de calibración avanzada</summary>
-                  <div className="mt-4">
-                    <textarea
-                      className="w-full h-60 p-3 border rounded bg-black/50 text-gray-200 font-mono text-sm"
-                      value={JSON.stringify(preset, null, 2)}
-                      onChange={e => {
-                        try {
-                          const newPreset = JSON.parse(e.target.value);
-                          setPreset(newPreset);
-                          if (templateImg) {
-                            renderPreview('https://ejemplo.com/qr-demo', 'ID-1234');
-                          }
-                        } catch {}
-                      }}
-                    />
-                    <p className="mt-2 text-gray-400">Modifica los valores con precaución. Los cambios se aplicarán inmediatamente.</p>
-                  </div>
-                </details>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+              <h2 className="text-xl font-semibold">Calibración (Valores de Referencia)</h2>
+              <div className="bg-gray-800/50 p-4 rounded-lg text-sm space-y-2">
+                <p><strong>DPI Detectado:</strong> {preset.dpi.toFixed(2)}</p>
+                <p><strong>Posición QR (X):</strong> {preset.qrArea.x} px</p>
+                <p><strong>Posición QR (Y):</strong> {preset.qrArea.y.toFixed(1)} px</p>
+                <p><strong>Ancho QR:</strong> {preset.qrArea.w} px</p>
+                <p><strong>Alto QR:</strong> {preset.qrArea.h} px</p>
               </div>
+              <p className="text-xs text-gray-400">Estos valores se basan en las constantes del archivo y no son editables directamente en la UI.</p>
             </motion.div>
           )}
         </div>
