@@ -26,7 +26,7 @@ export default function PlayWrapper() {
 
 function Play() {
   const searchParams = useSearchParams();
-  const id = searchParams.get('id') || '';
+  const id = searchParams?.get('id') || '';
   
   const [state, setState] = useState<PageState>(PageState.LOADING);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, hasStarted: false });
@@ -85,12 +85,18 @@ function Play() {
   // Manejar el resultado de la ruleta
   const handleRouletteResult = (result: any) => {
     setReward(result);
-    markIdAsPlayed(id);
-    
-    // Cambiar al estado de "jugado" después de un retraso
-    setTimeout(() => {
-      setState(PageState.PLAYED);
-    }, 3000);
+    // Si es un resultado de reintento no consumimos la pulsera
+    if (!result?.retry) {
+      markIdAsPlayed(id);
+      setTimeout(() => {
+        setState(PageState.PLAYED);
+      }, 2500);
+    } else {
+      // Permitir seguir jugando inmediatamente
+      setTimeout(() => {
+        setReward(null); // limpia panel para próxima tirada
+      }, 1500);
+    }
   };
   
   // Renderizado condicional según el estado
@@ -163,7 +169,7 @@ function Play() {
           </motion.div>
         )}
         
-        {state === PageState.PLAYED && (
+  {state === PageState.PLAYED && (
           <motion.div 
             className="bg-white dark:bg-gray-800 rounded-token-lg p-6 shadow-party-md"
             initial={{ opacity: 0 }}

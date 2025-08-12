@@ -62,6 +62,7 @@ interface Reward {
   color: string; // color de fondo del segmento
   textColor?: string; // opcional para contraste
   sparkle?: boolean; // resaltar segmento especial
+  retry?: boolean; // si permite volver a girar sin consumir el intento
 }
 
 // Siete segmentos: los 6 premios conocidos + un "Premio Especial" (placeholder). Ajustar label si deseas otro.
@@ -75,7 +76,7 @@ const wheelRewards: Reward[] = [
   { id: 4, name: 'Popcorn', probability: 0.145, color: '#31D2F2' },
   { id: 5, name: 'Agua', probability: 0.145, color: '#4DFFB8', textColor: '#065F46' },
   { id: 6, name: 'Chupetines', probability: 0.245, color: '#FFD93D', textColor: '#7A4E00' },
-  { id: 7, name: 'Premio Especial', probability: 0.03, color: '#FB923C', sparkle: true },
+  { id: 7, name: 'Un Nuevo Intento', probability: 0.03, color: '#FB923C', sparkle: true, retry: true },
 ];
 
 interface RouletteProps {
@@ -233,12 +234,12 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
               transition={{ delay: 0.05 }}
               className="text-xl font-heading font-bold mb-1"
             >
-              {result.sparkle ? '¡Premio Especial!' : '¡Ganaste!'}
+              {result.retry ? '¡Nuevo Intento!' : '¡Ganaste!'}
             </motion.h3>
             <p className="text-fiesta-purple font-extrabold text-2xl drop-shadow-sm">{result.name}</p>
-            {result.sparkle && (
+      {result.retry && (
               <div className="mt-3 flex justify-center gap-2 text-amber-500 text-sm">
-                <span className="animate-pulse">✨</span><span>Felicidades</span><span className="animate-pulse">✨</span>
+        <span className="animate-pulse">↺</span><span>Vuelve a girar</span><span className="animate-pulse">↺</span>
               </div>
             )}
           </motion.div>
