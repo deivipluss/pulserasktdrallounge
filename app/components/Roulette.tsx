@@ -254,7 +254,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           {rewards.map((reward, index) => {
             const angle = 360 / rewards.length;
             const rotationAngle = index * angle + (angle / 2);
-            const textRadius = '35%'; // Distancia desde el centro
+            const textRadius = '38%'; // Distancia desde el centro, ajustada para que no quede debajo del botón
 
             return (
               <div
@@ -266,16 +266,25 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                 }}
               >
                 <div 
-                  className="flex items-center justify-center"
+                  className="flex flex-col items-center justify-center"
                   style={{
-                    transform: `rotate(-90deg)` // Orientar el texto para que se lea desde el centro
+                    transform: `rotate(-90deg)` // Orientar el contenido para que se lea desde el centro
                   }}
                 >
+                  <div className="text-2xl" style={{ textShadow: '0 0 5px rgba(0,0,0,0.5)'}}>
+                    {reward.id === 1 && <span>🍬</span>}
+                    {reward.id === 2 && <span>🚬</span>}
+                    {reward.id === 3 && <span>🧠</span>}
+                    {reward.id === 4 && <span>🍿</span>}
+                    {reward.id === 5 && <span>💧</span>}
+                    {reward.id === 6 && <span>🍭</span>}
+                    {reward.id === 7 && <span>↺</span>}
+                  </div>
                   <span
-                    className="font-extrabold text-lg"
+                    className="font-bold text-xs uppercase tracking-wider mt-1"
                     style={{
                       color: reward.textColor || '#fff',
-                      textShadow: '0px 2px 4px rgba(0,0,0,0.5)',
+                      textShadow: '0px 1px 3px rgba(0,0,0,0.7)',
                     }}
                   >
                     {reward.name}
