@@ -254,7 +254,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           {rewards.map((reward, index) => {
             const angle = 360 / rewards.length;
             const rotationAngle = index * angle + (angle / 2);
-            const textRadius = '40%'; // Aumentamos la distancia desde el centro
+            const textRadius = '65%'; // Aumentamos significativamente la distancia para alejarla del centro
 
             return (
               <div
@@ -268,10 +268,10 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                 <div 
                   className="flex flex-col items-center justify-center"
                   style={{
-                    transform: `rotate(90deg)` // Orientar el contenido para que se lea desde el centro hacia afuera
+                    transform: `rotate(${180 - rotationAngle}deg)` // Orientación radial perfecta para cada segmento
                   }}
                 >
-                  <div className="text-2xl" style={{ textShadow: '0 0 5px rgba(0,0,0,0.5)'}}>
+                  <div className="text-xl mb-1" style={{ textShadow: '0 0 5px rgba(0,0,0,0.5)'}}>
                     {reward.id === 1 && <span>🍬</span>}
                     {reward.id === 2 && <span>🚬</span>}
                     {reward.id === 3 && <span>🧠</span>}
@@ -281,12 +281,10 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                     {reward.id === 7 && <span>↺</span>}
                   </div>
                   <span
-                    className="font-bold text-xs uppercase tracking-wider mt-1"
+                    className="font-bold text-xs uppercase tracking-wider text-center w-20"
                     style={{
                       color: reward.textColor || '#fff',
                       textShadow: '0px 1px 3px rgba(0,0,0,0.7)',
-                      writingMode: 'vertical-rl', // Asegura que el texto se escriba verticalmente
-                      textOrientation: 'mixed',
                     }}
                   >
                     {reward.name}
