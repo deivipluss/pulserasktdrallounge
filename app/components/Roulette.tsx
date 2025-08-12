@@ -208,49 +208,6 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
         {/* Brillo / aura */}
         <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/60 via-white/0 to-white/0 pointer-events-none"></div>
         
-        {/* Contenedor de las etiquetas de premios (fuera de la ruleta) */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none">
-          {rewards.map((reward, index) => {
-            const angle = (360 / rewards.length) * index + ((360 / rewards.length) / 2) - 90;
-            const radius = 48; // Porcentaje del radio para colocar las tarjetas (ej. 48% -> justo afuera)
-            const x = `calc(50% + ${radius * Math.cos(angle * Math.PI / 180)}% - 50px)`; // 50px es la mitad del ancho de la tarjeta
-            const y = `calc(50% + ${radius * Math.sin(angle * Math.PI / 180)}% - 35px)`; // 35px es la mitad de la altura
-
-            return (
-              <div
-                key={`label-card-${reward.id}`}
-                className="absolute flex flex-col items-center justify-center w-[100px] h-[70px] bg-black/80 rounded-lg border-2 border-white/50 shadow-lg"
-                style={{
-                  left: x,
-                  top: y,
-                  borderColor: reward.color,
-                  boxShadow: `0 0 15px ${reward.color}, 0 0 5px ${reward.color} inset`,
-                  zIndex: 5,
-                }}
-              >
-                <div className="text-2xl" style={{ textShadow: `0 0 8px ${reward.color}` }}>
-                  {reward.id === 1 && <span>🍬</span>}
-                  {reward.id === 2 && <span>🚬</span>}
-                  {reward.id === 3 && <span>🧠</span>}
-                  {reward.id === 4 && <span>🍿</span>}
-                  {reward.id === 5 && <span>💧</span>}
-                  {reward.id === 6 && <span>🍭</span>}
-                  {reward.id === 7 && <span>↺</span>}
-                </div>
-                <div 
-                  className="font-bold text-xs uppercase tracking-wider" 
-                  style={{
-                    color: reward.textColor || '#fff',
-                    textShadow: '0px 1px 2px rgba(0,0,0,0.8)'
-                  }}
-                >
-                  {reward.name}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
         {/* Ruleta */}
         <motion.div
           ref={wheelRef}
@@ -292,6 +249,41 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           
           {/* Borde interno decorativo */}
           <div className="absolute inset-8 rounded-full border-[3px] border-white/50 z-11 bg-white/5 backdrop-blur-[1px]"></div>
+
+          {/* Etiquetas de premios */}
+          {rewards.map((reward, index) => {
+            const angle = 360 / rewards.length;
+            const rotationAngle = index * angle + (angle / 2);
+            const textRadius = '35%'; // Distancia desde el centro
+
+            return (
+              <div
+                key={`label-${reward.id}`}
+                className="absolute top-1/2 left-1/2 w-auto h-auto -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
+                style={{
+                  transform: `rotate(${rotationAngle}deg) translateY(-${textRadius})`,
+                  zIndex: 15,
+                }}
+              >
+                <div 
+                  className="flex items-center justify-center"
+                  style={{
+                    transform: `rotate(-90deg)` // Orientar el texto para que se lea desde el centro
+                  }}
+                >
+                  <span
+                    className="font-extrabold text-lg"
+                    style={{
+                      color: reward.textColor || '#fff',
+                      textShadow: '0px 2px 4px rgba(0,0,0,0.5)',
+                    }}
+                  >
+                    {reward.name}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
           
           {/* Círculo central - después de las etiquetas pero antes del botón */}
           <div className="absolute inset-0 m-auto w-[35%] h-[35%] rounded-full bg-white/80 z-30 shadow-lg border-4 border-white/90"></div>
