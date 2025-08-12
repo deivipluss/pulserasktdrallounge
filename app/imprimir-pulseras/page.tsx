@@ -27,7 +27,7 @@ const WRISTBAND = {
     OFFSET_LEFT_PX: 1538, // Posición exacta desde la izquierda según el segundo pantallazo
     WIDTH_PX: 76,        // Ancho exacto del área del QR según el segundo pantallazo
     HEIGHT_PX: 76,       // Alto exacto del área del QR según el segundo pantallazo
-    QR_SIZE_PX: 76,      // QR del mismo tamaño que el área para ocupar todo el espacio disponible (sin margen)
+    QR_SIZE_PX: 85,      // QR más grande que el área para asegurar que ocupe todo el espacio blanco
     ID_OFFSET_Y: 86.1,   // Posición Y donde va el texto ID-1234 (justo debajo del QR)
   },
   // Mantenemos las medidas en MM para compatibilidad
@@ -199,8 +199,8 @@ export default function ImprimirPulserasPage() {
     const areaW = WRISTBAND.QR_AREA.WIDTH_PX * escala;
     const areaH = WRISTBAND.QR_AREA.HEIGHT_PX * escala;
     
-    // Tamaño del QR para que ocupe casi todo el área blanca
-    const qrMargin = 0; // Sin margen adicional para maximizar tamaño
+    // Tamaño del QR para que ocupe todo el área blanca
+    const qrMargin = 0; // Sin margen para maximizar tamaño
     const qrPx = WRISTBAND.QR_AREA.QR_SIZE_PX * escala;
     
     // Dibuja un área blanca del tamaño exacto según referencia
@@ -212,13 +212,13 @@ export default function ImprimirPulserasPage() {
     ctx.fill();
     ctx.restore();
     
-    // Genera QR con alto nivel de corrección de errores
-    const qrOpts = { errorCorrectionLevel: 'M' as const, margin: qrMargin, width: qrPx };
+    // Genera QR con nivel bajo de corrección de errores para maximizar tamaño
+    const qrOpts = { errorCorrectionLevel: 'L' as const, margin: qrMargin, width: qrPx };
     const qrUrl: string = await QRCode.toDataURL(qrData, qrOpts);
     const qrImg = new window.Image();
     
     qrImg.onload = () => {
-      // Centra perfectamente el QR en el área blanca
+      // Centra perfectamente el QR en el área blanca, con un pequeño ajuste para cubrir completamente el área
       const cx = areaX + (areaW - qrPx) / 2;
       const cy = areaY + (areaH - qrPx) / 2;
       ctx.drawImage(qrImg, cx, cy, qrPx, qrPx);
