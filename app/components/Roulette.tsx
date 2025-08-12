@@ -161,10 +161,15 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
   const OFFSET = 0;
 
   // Gradiente cónico exacto (sin offset interno; lo compensa el wrapper)
+  // IMPORTANTE: CSS conic-gradient 0deg está arriba y gira en sentido horario
+  // Los índices deben mostrar 0 arriba, luego 6, 5, 4 a la derecha, etc.
   const wheelGradient = useMemo(() => {
     const stops: string[] = [];
     for (let i = 0; i < n; i++) {
-      const color = data[i].color ?? `hsl(${(i * 360) / n}, 70%, 50%)`;
+      // Invertimos el orden para que los segmentos visual y lógicamente coincidan
+      // Porque la ruleta gira hacia la izquierda (negativo) pero CSS conic-gradient va horario
+      const actualIndex = (n - i) % n;
+      const color = data[actualIndex].color ?? `hsl(${(actualIndex * 360) / n}, 70%, 50%)`;
       const start = i * segment;
       const end = (i + 1) * segment;
       stops.push(`${color} ${start}deg ${end}deg`);
@@ -315,7 +320,10 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
 
             {/* Etiquetas radiales (con flip para lado izquierdo) */}
             {data.map((reward, i) => {
-              const angleCenter = (i + 0.5) * segment; // sin offset
+              // Invertimos el índice para mantener la consistencia visual-lógica
+              // Así el índice 0 queda arriba, igual que en el gradiente
+              const visualIndex = (n - i) % n;
+              const angleCenter = (visualIndex + 0.5) * segment;
               const aFinal = norm(angleCenter); // para decidir flip ya en la escena final
               const isFlipped = aFinal > 90 && aFinal < 270;
 
