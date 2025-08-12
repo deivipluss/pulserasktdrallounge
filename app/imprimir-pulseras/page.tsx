@@ -37,16 +37,16 @@ const WRISTBAND = {
 
 // Preset de calibración por defecto, actualizado con las medidas exactas
 const DEFAULT_PRESET = {
-  dpi: 600, // DPI para la impresión
+  dpi: 300, // DPI según el valor detectado en la imagen (300.00097895252077)
   qrArea: {
-    // Valores exactos según la imagen proporcionada
-    x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX, 
+    // Valores exactos según el JSON de calibración
+    x: 1500, // Posición X ajustada según el JSON
     y: 100, // Posición Y desde arriba para centrar verticalmente
-    w: WRISTBAND.QR_AREA.WIDTH_PX, 
-    h: WRISTBAND.QR_AREA.HEIGHT_PX, 
+    w: 76, // Ancho del área según JSON
+    h: 76, // Alto del área según JSON
     rotation: 0
   },
-  qrSizePx: WRISTBAND.QR_AREA.WIDTH_PX - 4, // Tamaño QR en píxeles, con margen mínimo
+  qrSizePx: 85, // Tamaño QR en píxeles, ajustado para llenar el espacio
   idLabel: { enabled: true, dy: 130, fontPx: 28, align: 'center' }, // Ajustado según imagen para que quede por debajo del QR
 };
 
@@ -193,15 +193,15 @@ export default function ImprimirPulserasPage() {
     // Calcular la escala proporcional
     const escala = templateImg.width / WRISTBAND.WIDTH_PX;
     
-    // Aplicar escala a las dimensiones
-    const areaX = WRISTBAND.QR_AREA.OFFSET_LEFT_PX * escala;
-    const areaY = 100 * escala; // Posición Y ajustada para que se vea bien
-    const areaW = WRISTBAND.QR_AREA.WIDTH_PX * escala;
-    const areaH = WRISTBAND.QR_AREA.HEIGHT_PX * escala;
+    // Aplicar escala a las dimensiones usando los valores del preset
+    const areaX = preset.qrArea.x * escala;
+    const areaY = preset.qrArea.y * escala;
+    const areaW = preset.qrArea.w * escala;
+    const areaH = preset.qrArea.h * escala;
     
     // Tamaño del QR para que ocupe todo el área blanca
     const qrMargin = 0; // Sin margen para maximizar tamaño
-    const qrPx = WRISTBAND.QR_AREA.QR_SIZE_PX * escala;
+    const qrPx = preset.qrSizePx * escala;
     
     // Dibuja un área blanca del tamaño exacto según referencia
     ctx.save();
@@ -225,16 +225,16 @@ export default function ImprimirPulserasPage() {
       
       // Dibuja el ID debajo del área blanca
       if (preset.idLabel?.enabled) {
-        const fontPx = Math.round(18 * escala); // Tamaño de fuente proporcional
+        const fontPx = preset.idLabel.fontPx * escala; // Usar tamaño definido en el preset
         ctx.save();
         ctx.font = `bold ${fontPx}px sans-serif`;
-        ctx.textAlign = 'center';
+        ctx.textAlign = (preset.idLabel.align || 'center') as CanvasTextAlign;
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#222222';
         
-        // Posición del ID debajo del área blanca
+        // Posición del ID debajo del área blanca según la configuración
         const labelX = areaX + areaW / 2;
-        const labelY = areaY + areaH + 5;
+        const labelY = areaY + (preset.idLabel.dy * escala / 6); // Ajustado según dy
         ctx.fillText(id, labelX, labelY);
         ctx.restore();
       }
