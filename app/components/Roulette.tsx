@@ -210,7 +210,7 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
         {/* Ruleta */}
         <motion.div
           ref={wheelRef}
-          className={`w-full h-full rounded-full relative overflow-hidden border-[6px] border-white shadow-[0_0_0_6px_rgba(0,0,0,0.15)] ${spinning ? 'animate-pulse-slow' : ''}`}
+          className={`w-full h-full rounded-full relative border-[6px] border-white shadow-[0_0_0_6px_rgba(0,0,0,0.15)] ${spinning ? 'animate-pulse-slow' : ''}`}
           animate={{ rotate: rotation }}
           transition={{ 
             duration: 5.2, 
@@ -249,16 +249,14 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
           {/* Borde interno decorativo */}
           <div className="absolute inset-8 rounded-full border-[3px] border-white/50 z-11 bg-white/5 backdrop-blur-[1px]"></div>
           
-          {/* Círculo central */}
-          <div className="absolute inset-0 m-auto w-[35%] h-[35%] rounded-full bg-white/80 z-15 shadow-lg border-4 border-white/90"></div>
-          
           {/* Etiquetas de premios - en capas superiores */}
+          {/* Las etiquetas deben ir antes del círculo central para que no las tape */}
           {rewards.map((reward, index) => {
             const angle = 360 / rewards.length;
             const rotate = index * angle;
             // Calculamos la posición del texto en coordenadas polares
             // Ajustamos para que esté más cerca del borde pero aún visible
-            const textRadiusPercent = 68; // distancia desde el centro (0-100%) 
+            const textRadiusPercent = 66; // distancia desde el centro (0-100%) - ligeramente más cerca del centro
             const textRotateRad = ((rotate + angle/2) * Math.PI) / 180;
             const textX = 50 + textRadiusPercent * Math.cos(textRotateRad);
             const textY = 50 + textRadiusPercent * Math.sin(textRotateRad);
@@ -272,37 +270,47 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride }
                   top: `${textY}%`,
                   left: `${textX}%`,
                   transform: `translate(-50%, -50%) rotate(${textAngle}deg)`,
-                  width: '100px',
+                  width: '120px', // Ampliado para más espacio
                   height: 'auto',
-                  zIndex: 50
+                  zIndex: 60 // Aumentamos para estar seguro que es visible
                 }}
               >
                 <div
-                  className={`text-center font-bold text-xs sm:text-sm md:text-base drop-shadow-md px-2 py-1 rounded-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
+                  className={`text-center font-bold text-xs sm:text-sm md:text-base drop-shadow-md px-3 py-2 rounded-md ${reward.sparkle ? 'animate-pulse-slow' : ''}`}
                   style={{
                     color: reward.textColor || '#fff',
-                    background: 'rgba(0,0,0,0.75)',
-                    textShadow: '0px 1px 2px rgba(0,0,0,0.9)',
+                    background: 'rgba(0,0,0,0.85)', // Más oscuro para mejor contraste
+                    textShadow: '0px 2px 3px rgba(0,0,0,0.9)',
                     lineHeight: 1.2,
-                    border: '2px solid rgba(255,255,255,0.8)',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                    whiteSpace: 'nowrap'
+                    border: '2px solid rgba(255,255,255,0.9)',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.5), 0 0 10px rgba(255,255,255,0.3)',
+                    whiteSpace: 'nowrap',
+                    transform: 'scale(1.1)', // Ligeramente más grande
+                    fontWeight: 800 // Más grueso
                   }}
                 >
                   {/* Iconos para cada premio */}
-                  {reward.id === 1 && <span className="mr-1">🍬</span>}
-                  {reward.id === 2 && <span className="mr-1">🚬</span>}
-                  {reward.id === 3 && <span className="mr-1">🧠</span>}
-                  {reward.id === 4 && <span className="mr-1">🍿</span>}
-                  {reward.id === 5 && <span className="mr-1">💧</span>}
-                  {reward.id === 6 && <span className="mr-1">🍭</span>}
-                  {reward.id === 7 && <span className="mr-1">↺</span>}
-                  {reward.name}
+                  <div className="flex flex-col items-center">
+                    <div className="text-2xl mb-1">
+                      {reward.id === 1 && <span>🍬</span>}
+                      {reward.id === 2 && <span>🚬</span>}
+                      {reward.id === 3 && <span>🧠</span>}
+                      {reward.id === 4 && <span>🍿</span>}
+                      {reward.id === 5 && <span>💧</span>}
+                      {reward.id === 6 && <span>🍭</span>}
+                      {reward.id === 7 && <span>↺</span>}
+                    </div>
+                    <div className="font-extrabold text-base" style={{textShadow: '0 0 5px white, 0 0 5px black'}}>{reward.name}</div>
+                  </div>
                 </div>
               </div>
             );
           })}
-            {/* Botón central */}
+          
+          {/* Círculo central - después de las etiquetas pero antes del botón */}
+          <div className="absolute inset-0 m-auto w-[35%] h-[35%] rounded-full bg-white/80 z-30 shadow-lg border-4 border-white/90"></div>
+          
+          {/* Botón central */}
             <button
               onClick={spin}
               disabled={spinning || disabled}
