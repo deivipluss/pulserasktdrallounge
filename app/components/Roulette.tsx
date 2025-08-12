@@ -157,8 +157,8 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
   const [spinning, setSpinning] = useState(false);
   const lastTarget = useRef(0);
 
-  // 12 en punto (se aplica como rotación estática al wrapper)
-  const OFFSET = -90; // mueve el 0° del gradiente a la parte superior
+  // En CSS conic-gradient 0deg ya apunta a las 12 en punto, así que OFFSET=0
+  const OFFSET = 0;
 
   // Gradiente cónico exacto (sin offset interno; lo compensa el wrapper)
   const wheelGradient = useMemo(() => {
@@ -178,8 +178,8 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
   // Ángulo objetivo para que el CENTRO del sector quede en el puntero (12h)
   const getTargetRotation = (idx: number) => {
     const jitter = (Math.random() - 0.5) * (segment * 0.5); // pequeño jitter dentro del sector
-    const thetaCenter = (idx + 0.5) * segment + jitter; // espacio sin offset
-    const base = -(OFFSET + thetaCenter); // compensar wrapper y alinear al puntero
+  const thetaCenter = (idx + 0.5) * segment + jitter; // centro del sector
+  const base = -(thetaCenter); // rotación necesaria para llevar centro al puntero (12h)
     const current = rotation;
     let target = base;
     const minAhead = current + 360 * 3; // ≥ 3 vueltas completas
@@ -211,9 +211,9 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
     const rows = data.map((p, i) => ({
       i,
       name: p.name,
-      start: norm(OFFSET + i * segment),
-      center: norm(OFFSET + (i + 0.5) * segment),
-      end: norm(OFFSET + (i + 1) * segment),
+      start: norm(i * segment),
+      center: norm((i + 0.5) * segment),
+      end: norm((i + 1) * segment),
     }));
     // eslint-disable-next-line no-console
     console.table(rows);
@@ -238,7 +238,6 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
         {/* Wrapper con OFFSET fijo a -90° (mueve el 0° del gradiente a 12 en punto) */}
         <motion.div
           className="absolute inset-0 rounded-full"
-          style={{ transform: `rotate(${OFFSET}deg)` }}
         >
           {/* Disco que gira */}
           <motion.div
@@ -271,7 +270,7 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
             {/* Etiquetas radiales (con flip para lado izquierdo) */}
             {data.map((reward, i) => {
               const angleCenter = (i + 0.5) * segment; // sin offset
-              const aFinal = norm(angleCenter + OFFSET); // para decidir flip ya en la escena final
+              const aFinal = norm(angleCenter); // para decidir flip ya en la escena final
               const isFlipped = aFinal > 90 && aFinal < 270;
 
               const labelRadius = radius * 0.68;
@@ -332,8 +331,8 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
           {data.map((r, i) => (
             <React.Fragment key={`dbg-${i}`}>
               <div>#{i + 1} {r.name}</div>
-              <div>start: {Math.round(norm(OFFSET + i * segment))}°</div>
-              <div>end: {Math.round(norm(OFFSET + (i + 1) * segment))}°</div>
+              <div>start: {Math.round(norm(i * segment))}°</div>
+              <div>end: {Math.round(norm((i + 1) * segment))}°</div>
             </React.Fragment>
           ))}
         </div>
