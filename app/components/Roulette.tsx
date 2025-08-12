@@ -177,12 +177,10 @@ const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
 
   // Ángulo objetivo para que el CENTRO del sector quede en el puntero (12h)
   const getTargetRotation = (idx: number) => {
-  // Pequeño jitter controlado para evitar que siempre se detenga exactamente en el centro.
-  // Demasiado jitter podía cruzar la línea y aparentar un premio distinto visualmente.
-  const JITTER_FRACTION = 0.08; // 8% del ancho del sector (antes 50%)
-  const jitter = (Math.random() - 0.5) * (segment * JITTER_FRACTION);
-  const thetaCenter = (idx + 0.5) * segment + jitter; // centro (con jitter seguro)
-  const base = -(thetaCenter); // rotación necesaria para llevar centro al puntero (12h)
+    // Sin jitter: aseguramos que el puntero queda exactamente en el centro del sector
+    // para evitar discrepancias visuales vs lógicas entre premio real y mostrado
+    const thetaCenter = (idx + 0.5) * segment; // centro exacto del sector
+    const base = -thetaCenter; // rotación necesaria para llevar centro al puntero (12h)
     const current = rotation;
     let target = base;
     const minAhead = current + 360 * 3; // ≥ 3 vueltas completas
