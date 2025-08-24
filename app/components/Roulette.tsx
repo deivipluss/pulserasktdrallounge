@@ -3,7 +3,32 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Estilos CSS para animaciones adicionales
+// Estilos CSS p      // Si hay un premio forzado, buscarlo por nombre (case insensitive)
+      const normalizedForcedPrize = forcedPrize.toLowerCase();
+      console.log('DEBUG-PREMIO: Buscando premio forzado:', normalizedForcedPrize);
+      
+      // Lista todos los premios disponibles para debug
+      console.log('DEBUG-PREMIO: Premios disponibles:', rewards.map(r => r.name.toLowerCase()));
+      
+      // Buscar el premio que coincide con el nombre forzado
+      // Primero busca coincidencia exacta, luego coincidencias parciales si no hay exacta
+      const exactMatch = rewards.find(r => r.name.toLowerCase() === normalizedForcedPrize);
+      const partialMatch = rewards.find(r => 
+        r.name.toLowerCase().startsWith(normalizedForcedPrize) ||
+        normalizedForcedPrize.startsWith(r.name.toLowerCase())
+      );
+      
+      const matchingReward = exactMatch || partialMatch;
+      
+      if (exactMatch) {
+        console.log('DEBUG-PREMIO: Premio encontrado (coincidencia exacta):', exactMatch.name);
+        return exactMatch;
+      } else if (partialMatch) {
+        console.log('DEBUG-PREMIO: Premio encontrado (coincidencia parcial):', partialMatch.name);
+        return partialMatch;
+      } else {
+        console.warn('DEBUG-PREMIO: Premio forzado NO encontrado:', forcedPrize);
+      }cionales
 const styles = `
 @keyframes pulse-slow {
   0%, 100% {
@@ -142,22 +167,29 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride, 
     // Si hay un premio forzado, buscarlo por nombre (case insensitive)
     if (forcedPrize) {
       const normalizedForcedPrize = forcedPrize.toLowerCase();
-      console.log('Buscando premio forzado:', normalizedForcedPrize);
+      console.log('DEBUG-PREMIO: Buscando premio forzado:', normalizedForcedPrize);
+      
+      // Lista todos los premios disponibles para debug
+      console.log('DEBUG-PREMIO: Premios disponibles:', rewards.map(r => r.name.toLowerCase()));
       
       // Buscar el premio que coincide con el nombre forzado
       // Primero busca coincidencia exacta, luego coincidencias parciales si no hay exacta
-      const matchingReward = rewards.find(r => 
-        r.name.toLowerCase() === normalizedForcedPrize
-      ) || rewards.find(r => 
+      const exactMatch = rewards.find(r => r.name.toLowerCase() === normalizedForcedPrize);
+      const partialMatch = rewards.find(r => 
         r.name.toLowerCase().startsWith(normalizedForcedPrize) ||
         normalizedForcedPrize.startsWith(r.name.toLowerCase())
       );
       
-      if (matchingReward) {
-        console.log('Premio forzado encontrado:', matchingReward.name);
-        return matchingReward;
+      const matchingReward = exactMatch || partialMatch;
+      
+      if (exactMatch) {
+        console.log('DEBUG-PREMIO: Premio encontrado (coincidencia exacta):', exactMatch.name);
+        return exactMatch;
+      } else if (partialMatch) {
+        console.log('DEBUG-PREMIO: Premio encontrado (coincidencia parcial):', partialMatch.name);
+        return partialMatch;
       } else {
-        console.warn('Premio forzado no encontrado:', forcedPrize);
+        console.warn('DEBUG-PREMIO: Premio forzado NO encontrado:', forcedPrize);
       }
     }
     
