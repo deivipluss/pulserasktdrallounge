@@ -145,9 +145,10 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride, 
       console.log('Buscando premio forzado:', normalizedForcedPrize);
       
       // Buscar el premio que coincide con el nombre forzado
-      // Usamos startsWith para permitir coincidencias parciales (ej. "agua" coincide con "Agua")
+      // Primero busca coincidencia exacta, luego coincidencias parciales si no hay exacta
       const matchingReward = rewards.find(r => 
-        r.name.toLowerCase() === normalizedForcedPrize || 
+        r.name.toLowerCase() === normalizedForcedPrize
+      ) || rewards.find(r => 
         r.name.toLowerCase().startsWith(normalizedForcedPrize) ||
         normalizedForcedPrize.startsWith(r.name.toLowerCase())
       );
