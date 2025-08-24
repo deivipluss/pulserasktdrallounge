@@ -142,9 +142,14 @@ export default function Roulette({ onResult, disabled = false, rewardsOverride, 
     // Si hay un premio forzado, buscarlo por nombre (case insensitive)
     if (forcedPrize) {
       const normalizedForcedPrize = forcedPrize.toLowerCase();
+      console.log('Buscando premio forzado:', normalizedForcedPrize);
+      
       // Buscar el premio que coincide con el nombre forzado
+      // Usamos startsWith para permitir coincidencias parciales (ej. "agua" coincide con "Agua")
       const matchingReward = rewards.find(r => 
-        r.name.toLowerCase() === normalizedForcedPrize
+        r.name.toLowerCase() === normalizedForcedPrize || 
+        r.name.toLowerCase().startsWith(normalizedForcedPrize) ||
+        normalizedForcedPrize.startsWith(r.name.toLowerCase())
       );
       
       if (matchingReward) {
