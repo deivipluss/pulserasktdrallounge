@@ -1,19 +1,6 @@
 'use client';
 
-import { useState, use// Preset de calibración por defecto, actualizado con las medidas exactas
-const DEFAULT_PRESET = {
-  dpi: 600, // DPI para la impresión
-  qrArea: {
-    // Valores exactos según la imagen proporcionada
-    x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX - (WRISTBAND.QR_AREA.WIDTH_PX / 2), // Centro X - mitad del ancho
-    y: 100, // Posición Y desde el top para que se vea bien centrado
-    w: WRISTBAND.QR_AREA.WIDTH_PX, 
-    h: WRISTBAND.QR_AREA.HEIGHT_PX, 
-    rotation: 0
-  },
-  qrSizePx: WRISTBAND.QR_AREA.QR_SIZE_PX, // Tamaño exacto del QR según imagen
-  idLabel: { enabled: true, dy: 40, fontPx: 24, align: 'center' }, // Ajustado para que quede por debajo del QR
-}; } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Dropzone, { DropzoneOptions, FileRejection } from 'react-dropzone';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
@@ -54,7 +41,7 @@ const DEFAULT_PRESET = {
   qrArea: {
     // Valores exactos según la imagen proporcionada
     x: WRISTBAND.QR_AREA.OFFSET_LEFT_PX, 
-    y: WRISTBAND.QR_AREA.TOP_MARGIN_PX, 
+    y: 100, // Posición Y desde el top 
     w: WRISTBAND.QR_AREA.WIDTH_PX, 
     h: WRISTBAND.QR_AREA.HEIGHT_PX, 
     rotation: 0
