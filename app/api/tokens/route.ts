@@ -20,9 +20,85 @@ interface TokenEntry {
   used: boolean;
 }
 
-// Manejo de solicitudes GET para listar tokens de un día específico
+// Tipo para los registros CSV de tokens
+interface TokenRecord {
+  id: string;
+  day: string;
+  prize: string;
+  sig: string;
+  url: string;
+}
+
+/**
+ * Obtiene información de un token específico por su ID
+ * @param id ID del token a buscar
+ */
+async function getTokenById(id: string): Promise<NextResponse> {
+  // Extraer la fecha del ID (formato esperado: ktd-YYYY-MM-DD-XXX)
+  const dateMatch = id.match(/ktd-(\d{4}-\d{2}-\d{2})-\d+/);
+  if (!dateMatch) {
+    return NextResponse.json(
+      { success: false, error: 'Formato de ID inválido' },
+      { status: 400 }
+    );
+  }
+
+  const tokenDate = dateMatch[1];
+  const csvFilePath = path.join(process.cwd(), 'tokens', `${tokenDate}.csv`);
+  
+  // Verificar si existe el archivo CSV
+  if (!fs.existsSync(csvFilePath)) {
+    console.error(`Archivo de tokens no encontrado: ${csvFilePath}`);
+    return NextResponse.json(
+      { success: false, error: 'Tokens no encontrados para esta fecha' },
+      { status: 404 }
+    );
+  }
+
+  try {
+    // Leer el archivo CSV
+    const fileContent = fs.readFileSync(csvFilePath, 'utf8');
+    const records = parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true
+    }) as TokenRecord[];
+
+    // Buscar el token específico
+    const tokenRecord = records.find((record: TokenRecord) => record.id === id);
+    if (!tokenRecord) {
+      console.log(`Token no encontrado en CSV: ${id}`);
+      return NextResponse.json(
+        { success: false, error: 'Token no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    // Devolver información relevante del token
+    return NextResponse.json({
+      success: true,
+      id: tokenRecord.id,
+      day: tokenRecord.day,
+      prize: tokenRecord.prize
+    });
+  } catch (error) {
+    console.error('Error al procesar archivo de tokens:', error);
+    return NextResponse.json(
+      { success: false, error: 'Error al procesar tokens' },
+      { status: 500 }
+    );
+  }
+}
+
+// Manejo de solicitudes GET para listar tokens o obtener información de un token específico
 export async function GET(request: NextRequest) {
-  // Verificar token de administrador
+  // Verificar si se solicita un token específico por ID
+  const id = request.nextUrl.searchParams.get('id');
+  
+  if (id) {
+    return getTokenById(id);
+  }
+  
+  // Para listar todos los tokens, verificar token de administrador
   const token = request.nextUrl.searchParams.get('token');
   const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin-token-2025';
   
@@ -55,14 +131,14 @@ export async function GET(request: NextRequest) {
     const records = parse(fileContent, {
       columns: true,
       skip_empty_lines: true
-    });
+    }) as TokenRecord[];
     
     // Obtener estado de uso de cada token desde localStorage
     // Aquí solo devolvemos todos como "no utilizados" ya que
     // el estado real de uso se consulta desde el lado del cliente
-    const tokens: TokenEntry[] = records.map((record: any) => ({
+    const tokens: TokenEntry[] = records.map((record: TokenRecord) => ({
       id: record.id,
-      prize: parseInt(record.prize, 10),
+      prize: parseInt(record.prize, 10) || 0,
       used: false
     }));
     
