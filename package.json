@@ -37,7 +37,7 @@
     "@types/node": "^20",
     "@types/papaparse": "^5.3.16",
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^19",
+    "@types/react": "^19.1.10",
     "@types/react-dom": "^19",
     "@types/react-dropzone": "^5.1.0",
     "chalk": "^5.5.0",

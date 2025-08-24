@@ -2,22 +2,6 @@
 
 Una aplicación web para un evento especial donde los asistentes pueden escanear un código QR en sus pulseras para participar en un juego de ruleta y ganar premios.
 
-## Solución a Problemas de Visualización de Premios
-
-Se ha corregido un error crítico en la ruleta donde los premios visualizados no correspondían con los premios ganados. Ver [SOLUCION_RULETA.md](SOLUCION_RULETA.md) para detalles de la implementación.
-
-### Herramientas de Depuración
-
-Para verificar el funcionamiento correcto de la ruleta:
-
-1. Accede a la página: [http://localhost:3001/jugar?id=ktd-2025-08-20-001](http://localhost:3001/jugar?id=ktd-2025-08-20-001)
-2. Abre la consola del navegador (F12)
-3. Carga el script de verificación:
-   ```javascript
-   fetch('/verificar-ruleta.js').then(r => r.text()).then(code => eval(code))
-   ```
-4. Consulta la guía detallada: [http://localhost:3001/debug-guide.html](http://localhost:3001/debug-guide.html)
-
 ## Actualización: Sistema de Premio Garantizado y Accesibilidad Mejorada
 
 Esta actualización implementa un sistema de "Nuevo intento" con premio garantizado para la ruleta y mejoras significativas en accesibilidad:
@@ -112,31 +96,6 @@ pnpm ts-node scripts/generate-tokens.ts
 2. Verificar el estado del evento y la cuenta regresiva
 3. Probar la validación de tokens y el flujo completo del juego
 4. Explorar la demostración en `/demo/seven-wheel` para probar la ruleta en modos "free" y "force"
-
-### Instrucciones para probar y depurar la ruleta
-
-1. **Acceder a la página de juego**:
-   - Con token predefinido: http://localhost:3000/jugar?id=ktd-2025-08-20-001
-   - Con diferentes premios: prueba otros IDs como ktd-2025-08-20-002, ktd-2025-08-20-003, etc.
-
-2. **Depurar desde la consola del navegador**:
-   - Abre la consola del navegador (F12 o Cmd+Option+I en Mac)
-   - Carga el script de verificación:
-     ```javascript
-     fetch('/verificar-ruleta.js').then(r => r.text()).then(code => eval(code))
-     ```
-   - O carga el script de prueba completo:
-     ```javascript
-     fetch('/test-ruleta.js').then(r => r.text()).then(code => eval(code))
-     ```
-   - Comandos disponibles:
-     - `probarTodosLosPremios()` - Prueba todos los premios en secuencia
-     - `probarPremio("Popcorn")` - Prueba un premio específico
-     - `window.__showRouletteSectors()` - Muestra información sobre los sectores
-
-3. **Verificar alineación de sectores**:
-   - Activa el modo debug: `window.__debugRouletteMode = true`
-   - Revisa la consola para mensajes detallados sobre cada sector
 
 ### URLs principales:
 

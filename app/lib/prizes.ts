@@ -1,6 +1,6 @@
 'use client';
 
-import { Prize } from '../components/Wheel';
+import { Prize } from '../types/prizes';
 
 // Lista de premios disponibles con sus stocks iniciales
 export const initialPrizes: Prize[] = [

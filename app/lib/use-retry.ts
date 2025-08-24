@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Prize } from '../components/Wheel';
+import { Prize } from '../types/prizes';
 import { getRetryState, saveRetryState } from './user-storage';
 
 // Hook personalizado para gestionar el estado de reintentos

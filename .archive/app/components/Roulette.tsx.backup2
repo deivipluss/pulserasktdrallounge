@@ -1,0 +1,1009 @@
+'use client';
+
+// Extendemos el objeto Window para las propiedades globales personalizadas
+declare global {
+  interface Window {
+    __forcedRewardIndex?: number | null;
+    __selectedReward?: any;
+  }
+}
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// ——————————————————————————————————————————————————————————
+// Tipos y configuración 
+// ——————————————————————————————————————————————————————————
+export interface Reward {
+  id: number;
+  name: string;
+  probability: number;
+  color: string;
+  textColor?: string;
+  sparkle?: boolean;
+  retry?: boolean;
+  emoji?: string;
+}
+
+// Configuración de premios con emojis distintivos para mejor identificación visual
+const DEFAULT_REWARDS: Reward[] = [
+  { id: 1, name: 'Trident', emoji: '🍬', probability: 0.145, color: '#FF4D8D', textColor: '#FFFFFF' },
+  { id: 2, name: 'Cigarrillos', emoji: '🚬', probability: 0.145, color: '#9B4DFF', textColor: '#FFFFFF' },
+  { id: 3, name: 'Cerebritos', emoji: '🍭', probability: 0.145, color: '#4D9EFF', textColor: '#FFFFFF' },
+  { id: 4, name: 'Popcorn', emoji: '🍿', probability: 0.145, color: '#31D2F2', textColor: '#000000' },
+  { id: 5, name: 'Agua', emoji: '💧', probability: 0.145, color: '#4DFFB8', textColor: '#003B2A' },
+  { id: 6, name: 'Chupetines', emoji: '🍭', probability: 0.245, color: '#FFD93D', textColor: '#5F3A00' },
+  { id: 7, name: 'Un Nuevo Intento', emoji: '🔄', probability: 0.03, color: '#FB923C', textColor: '#000000', sparkle: true, retry: true },
+];
+
+// ——————————————————————————————————————————————————————————
+// Utilidades
+// ——————————————————————————————————————————————————————————
+const norm = (deg: number) => ((deg % 360) + 360) % 360;
+const px = (v: number) => `${Math.round(v)}px`;
+
+// Selección ponderada de premios
+function pickWeighted(rewards: Reward[]): { reward: Reward; index: number } {
+  const total = rewards.reduce((s, r) => s + (r.probability || 0), 0) || 1;
+  let r = Math.random() * total;
+  for (let i = 0; i < rewards.length; i++) {
+    r -= rewards[i].probability || 0;
+    if (r <= 0) return { reward: rewards[i], index: i };
+  }
+  return { reward: rewards[rewards.length - 1], index: rewards.length - 1 };
+}
+
+// Efecto confetti
+function launchConfetti() {
+  try {
+    const canvasId = '__mini_confetti';
+    let canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.id = canvasId;
+      Object.assign(canvas.style, {
+        position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '9999',
+      } as CSSStyleDeclaration);
+      document.body.appendChild(canvas);
+    }
+    const ctx = canvas.getContext('2d');
+    const resize = () => { canvas!.width = window.innerWidth; canvas!.height = window.innerHeight; };
+    resize();
+    const onResize = () => resize();
+    window.addEventListener('resize', onResize);
+
+    const w = canvas!.width, h = canvas!.height;
+    const pieces = Array.from({ length: 140 }).map(() => ({
+      x: Math.random() * w,
+      y: -20 - Math.random() * 100,
+      vx: -2 + Math.random() * 4,
+      vy: 2 + Math.random() * 3,
+      size: 4 + Math.random() * 6,
+      a: Math.random() * Math.PI,
+      vr: -0.1 + Math.random() * 0.2,
+      color: `hsl(${Math.floor(Math.random() * 360)}, 80%, 60%)`,
+    }));
+    let frame = 0;
+    const maxFrames = 220;
+    function draw() {
+      frame++;
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+      pieces.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.a += p.vr;
+        p.vx *= 0.99;
+        p.vy *= 0.99;
+        p.vy += 0.08;
+        ctx!.save();
+        ctx!.translate(p.x, p.y);
+        ctx!.rotate(p.a);
+        ctx!.fillStyle = p.color;
+        ctx!.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx!.restore();
+      });
+      if (frame < maxFrames) requestAnimationFrame(draw);
+      else {
+        window.removeEventListener('resize', onResize);
+        document.body.removeChild(canvas!);
+      }
+    }
+    requestAnimationFrame(draw);
+  } catch (e) {
+    console.error('Error al lanzar confeti:', e);
+  }
+}
+
+// ——————————————————————————————————————————————————————————
+// Componente Ruleta
+// ——————————————————————————————————————————————————————————
+interface RouletteProps {
+  data?: Reward[];
+  size?: number;
+  duration?: number;
+  onResult?: (reward: Reward, index: number) => void;
+  disabled?: boolean;
+  debug?: boolean;
+}
+
+const Roulette: React.FC<RouletteProps> = ({
+  data = DEFAULT_REWARDS,
+  size: sizeProp,
+  duration = 6000,
+  onResult,
+  disabled = false,
+  debug = false,
+}) => {
+  // Referencias y estado
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [autoSize, setAutoSize] = useState(300);
+  const [rotation, setRotation] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const [reward, setReward] = useState<Reward | null>(null);
+  const selectedRewardRef = useRef<{reward: Reward, index: number} | null>(null);
+  const forcedIndex = useRef<number | null>(null);
+  
+  // Cálculos geométricos básicos
+  const n = data.length;
+  const segment = 360 / n;
+  const diameter = sizeProp ?? autoSize;
+  const radius = diameter / 2;
+
+  // Autoajuste al tamaño del contenedor
+  useEffect(() => {
+    if (sizeProp) return;
+    const updateSize = () => {
+      if (!containerRef.current) return;
+      const container = containerRef.current;
+      const maxWidth = container.clientWidth * 0.95;
+      const maxHeight = window.innerHeight * 0.7;
+      setAutoSize(Math.max(200, Math.min(maxWidth, maxHeight)));
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [sizeProp]);
+  
+  // CORRECCIÓN: Ajustar el offset del gradiente para alinear correctamente los colores con las etiquetas
+  // 1. Generación del gradiente de color (corregido para alineación perfecta)
+  const wheelGradient = useMemo(() => {
+    const stops = data.map((reward, i) => {
+      const startPct = (i * 100) / n;
+      const endPct = ((i + 1) * 100) / n;
+      // Esta sintaxis de "doble posición" crea bordes duros y nítidos entre colores,
+      // eliminando el antialiasing del navegador que causa el desfase visual.
+      return `${reward.color} ${startPct}% ${endPct}%`;
+    });
+    // El offset de -90deg asegura que el primer sector comience en la parte superior (12 en punto)
+    return `conic-gradient(from -90deg, ${stops.join(', ')})`;
+  }, [data, n]);
+
+  // 2. Cálculo de las líneas divisorias (CORREGIDO)
+  const dividers = useMemo(
+    () =>
+      // Los separadores deben alinearse con los bordes de los sectores
+      // Cada separador debe situarse en: i * segment - 90 (sin el ajuste adicional de -0.5)
+      Array.from({ length: n }).map((_, i) => i * segment - 90),
+    [n, segment]
+  );
+
+  // Función para calcular la rotación objetivo
+  const getTargetRotation = (idx: number): number => {
+    // Validación del índice
+    if (idx < 0 || idx >= data.length) {
+      console.error(`[Ruleta] Índice inválido: ${idx}, usando índice 0`);
+      idx = 0;
+    }
+    
+    // Cálculo puramente geométrico por sector
+    const sectorCenter = (idx + 0.5) * segment;
+    let base = -sectorCenter;
+    
+    // Aplicamos vueltas mínimas para un efecto visual satisfactorio
+    const minRotations = 4;
+    const currentNormalized = norm(rotation);
+    let target = base;
+
+    // Normalizar target a [0,360)
+    target = norm(target);
+
+    // Aseguramos que gire al menos las vueltas mínimas desde la posición actual
+    while (target < currentNormalized + 360 * minRotations) {
+      target += 360;
+    }
+    
+    return target;
+  };
+
+  // Detectar índice forzado desde la variable global
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const checkForced = () => {
+        if (window.__forcedRewardIndex !== undefined && window.__forcedRewardIndex !== null) {
+          forcedIndex.current = window.__forcedRewardIndex;
+          window.__forcedRewardIndex = null;
+          console.log('[Ruleta] Índice forzado recibido:', forcedIndex.current);
+        }
+      };
+      
+      const initialCheck = setTimeout(checkForced, 500);
+      const intervalCheck = setInterval(checkForced, 300);
+      
+      return () => {
+        clearTimeout(initialCheck);
+        clearInterval(intervalCheck);
+      };
+    }
+  }, []);
+
+  // Función para girar la ruleta
+  const spin = () => {
+    if (spinning || disabled) return;
+    
+    // Determinar el premio (forzado o aleatorio)
+    let selectedIndex: number;
+    let selectedReward: Reward;
+    
+    if (forcedIndex.current !== null) {
+      selectedIndex = forcedIndex.current;
+      
+      if (selectedIndex >= 0 && selectedIndex < data.length) {
+        selectedReward = data[selectedIndex];
+        console.log(`[Ruleta] Usando premio forzado: ${selectedReward.name} (índice ${selectedIndex})`);
+      } else {
+        console.warn(`[Ruleta] Índice forzado inválido: ${selectedIndex}, usando selección aleatoria`);
+        const result = pickWeighted(data);
+        selectedIndex = result.index;
+        selectedReward = result.reward;
+      }
+      
+      forcedIndex.current = null;
+    } else {
+      const result = pickWeighted(data);
+      selectedIndex = result.index;
+      selectedReward = result.reward;
+    }
+    
+    // IMPORTANTE: Almacenamos la selección original en una referencia estable
+    selectedRewardRef.current = {
+      reward: selectedReward,
+      index: selectedIndex
+    };
+    
+    // También lo exponemos globalmente para depuración
+    if (typeof window !== 'undefined') {
+      window.__selectedReward = selectedReward;
+    }
+    
+    // Iniciar animación
+    console.log(`[Ruleta] Girando hacia premio: ${selectedReward.name} (índice ${selectedIndex})`);
+    setSpinning(true);
+    
+    // Calcular rotación objetivo
+    const target = getTargetRotation(selectedIndex);
+    setRotation(target);
+    
+    // Finalizar el giro después de la animación
+    window.setTimeout(() => {
+      setSpinning(false);
+      
+      // Usar SIEMPRE el premio almacenado en la referencia, para evitar
+      // cualquier posible problema de "race condition" o actualización de estado
+      if (selectedRewardRef.current) {
+        const finalReward = selectedRewardRef.current.reward;
+        const finalIndex = selectedRewardRef.current.index;
+        
+        // Establecemos el premio ganador
+        setReward(finalReward);
+        
+        if (finalReward.sparkle) {
+          launchConfetti();
+        }
+        
+        console.log(`[Ruleta] Premio final: ${finalReward.name}`);
+        onResult?.(finalReward, finalIndex);
+      }
+    }, duration);
+  };
+
+  return (
+    <div ref={containerRef} className="relative" suppressHydrationWarning>
+      {/* Indicador de premio en la parte superior */}
+      <div 
+        className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-4 z-20 pointer-events-none"
+        suppressHydrationWarning
+      >
+        <div className="relative">
+          {/* Triángulo indicador */}
+          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-[15px]">
+            <div className="w-0 h-0 
+                      border-l-[16px] border-l-transparent
+                      border-r-[16px] border-r-transparent
+                      border-t-[24px] border-t-amber-500
+                      filter drop-shadow-lg"></div>
+          </div>
+
+          {/* Base circular */}
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 -translate-y-[24px]
+                       w-8 h-8 rounded-full bg-white border-[3px] border-amber-500 
+                       shadow-md z-20"></div>
+          
+          {/* Texto "PREMIO" */}
+          <div className="absolute top-1 left-1/2 transform -translate-x-1/2 translate-y-[6px]
+                        bg-amber-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-full
+                        shadow-md z-30">PREMIO</div>
+          
+          {/* Efecto de pulso */}
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 -translate-y-[24px]
+                        w-16 h-8 opacity-0
+                        animate-ping rounded-full bg-amber-500/30"></div>
+        </div>
+      </div>
+      
+      {/* Contenedor principal de la ruleta */}
+      <div
+        className="relative mx-auto rounded-full overflow-hidden aspect-square"
+        style={{ width: px(diameter), height: px(diameter) }}
+        suppressHydrationWarning
+      >
+        {/* Ruleta giratoria */}
+        <motion.div
+          className="relative w-full h-full"
+          animate={{ rotate: rotation }}
+          initial={{ rotate: 0 }} 
+          transition={{ 
+            duration: duration / 1000, 
+            type: 'spring', 
+            bounce: 0.1, 
+            damping: 15,
+            stiffness: 20,
+            mass: 1.5
+          }}
+          suppressHydrationWarning
+        >
+          {/* Disco de color */}
+          <motion.div
+            className="w-full h-full"
+            style={{
+              background: wheelGradient,
+              boxShadow: 'inset 0 0 0 8px rgba(255,255,255,0.1)',
+            }}
+            suppressHydrationWarning
+          ></motion.div>
+
+          {/* Líneas divisorias (CORREGIDAS) */}
+          {dividers.map((angle, i) => (
+            <div
+              key={`divider-${i}`}
+              className="absolute top-1/2 left-1/2 w-[50%] h-[1px] origin-left bg-white/20 -translate-y-1/2"
+              style={{ transform: `translateY(-50%) rotate(${angle}deg)` }}
+            />
+          ))}
+
+          {/* Etiquetas de premios con emojis (corregidas para alineación) */}
+          {data.map((reward, i) => {
+            // CORRECCIÓN: Ajustamos el ángulo para alinear con el nuevo gradiente
+            // El centro del sector debe estar en el centro de cada segmento de color
+            // Usamos -90° porque el gradiente empieza en -90deg (parte superior)
+            const angleCenter = (i * segment + segment / 2) - 90; 
+            const aFinal = norm(angleCenter);
+            const isFlipped = aFinal > 90 && aFinal < 270;
+            
+            // Calculamos el ancho máximo para la etiqueta
+            const labelRadius = radius * 0.68;
+            const segRad = (segment * Math.PI) / 180;
+            const maxWidth = Math.floor(2 * labelRadius * Math.sin(segRad / 2) * 0.82);
+
+            return (
+              <div
+                key={`label-${i}`}
+                className="absolute left-1/2 top-1/2"
+                data-label-index={i}
+                style={{ 
+                  transform: `rotate(${angleCenter}deg) translate(${px(labelRadius)})`, 
+                  transformOrigin: '0 0'
+                }}
+              >
+                <span
+                  className="block text-center text-[clamp(10px,1.7vw,18px)] font-semibold leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] break-words whitespace-normal"
+                  style={{
+                    width: px(maxWidth),
+                    transform: `translateX(-50%) rotate(${isFlipped ? 180 : 0}deg)`,
+                    color: reward.textColor || '#111',
+                  }}
+                >
+                  {reward.emoji ? `${reward.emoji} ${reward.name}` : reward.name}
+                </span>
+              </div>
+            );
+          })}
+        </motion.div>
+
+        {/* Botón central */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[28%] h-[28%] rounded-full bg-white/95 border border-white/70 shadow-[inset_0_2px_8px_rgba(0,0,0,0.1),0_8px_24px_rgba(0,0,0,0.2)] flex items-center justify-center" suppressHydrationWarning>
+          <button
+            onClick={spin}
+            disabled={spinning || disabled}
+            className="px-5 py-2 rounded-full text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+            style={{ background: 'linear-gradient(180deg,#f59e0b,#ea580c)' }}
+          >
+            {spinning ? 'Girando…' : 'Girar'}
+          </button>
+        </div>
+      </div>
+
+      {/* Información de probabilidades */}
+      <AnimatePresence>
+        {!spinning && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="mt-4 text-center text-sm text-white/90"
+          >
+            <div className="opacity-80" suppressHydrationWarning>
+              {`Probabilidades: Chupetines ${Math.round((data.find(d=>d.name==='Chupetines')?.probability||0)*100)}%, Nuevo intento ${Math.round((data.find(d=>d.retry)?.probability||0)*100)}%`}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Panel de premio ganador */}
+      {spinning === false && reward && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-6 py-3 px-4 rounded-lg bg-gradient-to-r from-amber-50 to-amber-100 
+                     dark:from-amber-900/50 dark:to-amber-800/50
+                     border border-amber-200 dark:border-amber-700
+                     shadow-lg text-center"
+          suppressHydrationWarning
+        >
+          <div className="text-sm opacity-70 mb-1">¡Premio ganador!</div>
+          <div 
+            className="text-xl font-bold" 
+            style={{ 
+              color: reward.color, 
+              textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              backgroundColor: `${reward.color}20`
+            }}
+          >
+            {reward.emoji ? `${reward.emoji} ${reward.name}` : reward.name}
+          </div>
+          <div className="text-xs mt-2 opacity-80">
+            {reward.retry ? '¡Puedes volver a girar!' : 'Reclama tu premio con un organizador'}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+'use client';
+
+// ... existing code ...
+
+export default Roulette;
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// ——————————————————————————————————————————————————————————
+// Tipos y configuración (traídos de V1)
+// ——————————————————————————————————————————————————————————
+export interface Reward {
+  id: number; // índice (1-based)
+  name: string; // etiqueta visible
+  probability: number; // peso relativo (suma ≈ 1)
+  color: string; // color de segmento
+  textColor?: string; // color del texto del label
+  sparkle?: boolean; // efecto confetti al ganar
+  retry?: boolean; // semántica de "nuevo intento"
+}
+
+// Mismo orden, colores y distribución de V1
+const DEFAULT_REWARDS_V1: Reward[] = [
+  { id: 1, name: 'Trident',       probability: 0.145, color: '#FF4D8D', textColor: '#FFFFFF' },
+  { id: 2, name: 'Cigarrillos',   probability: 0.145, color: '#9B4DFF', textColor: '#FFFFFF' },
+  { id: 3, name: 'Cerebritos',    probability: 0.145, color: '#4D9EFF', textColor: '#FFFFFF' },
+  { id: 4, name: 'Popcorn',       probability: 0.145, color: '#31D2F2', textColor: '#000000' },
+  { id: 5, name: 'Agua',          probability: 0.145, color: '#4DFFB8', textColor: '#003B2A' },
+  { id: 6, name: 'Chupetines',    probability: 0.245, color: '#FFD93D', textColor: '#5F3A00' },
+  { id: 7, name: 'Un Nuevo Intento', probability: 0.03, color: '#FB923C', textColor: '#000000', sparkle: true, retry: true },
+];
+
+// ——————————————————————————————————————————————————————————
+// Utilidades (ponderación V1 + geometría V2)
+// ——————————————————————————————————————————————————————————
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const norm = (deg: number) => ((deg % 360) + 360) % 360;
+
+function pickWeighted(rewards: Reward[]): { reward: Reward; index: number } {
+  const total = rewards.reduce((s, r) => s + (r.probability || 0), 0) || 1;
+  let r = Math.random() * total;
+  for (let i = 0; i < rewards.length; i++) {
+    r -= rewards[i].probability || 0;
+    if (r <= 0) return { reward: rewards[i], index: i };
+  }
+  return { reward: rewards[rewards.length - 1], index: rewards.length - 1 };
+}
+
+// Confetti liviano (traído y simplificado de V1)
+function launchConfetti() {
+  try {
+    const canvasId = '__mini_confetti';
+    let canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.id = canvasId;
+      Object.assign(canvas.style, {
+        position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '9999',
+      } as CSSStyleDeclaration);
+      document.body.appendChild(canvas);
+    }
+    const ctx = canvas.getContext('2d');
+    const resize = () => { canvas!.width = window.innerWidth; canvas!.height = window.innerHeight; };
+    resize();
+    const onResize = () => resize();
+    window.addEventListener('resize', onResize);
+
+    const w = canvas!.width, h = canvas!.height;
+    const pieces = Array.from({ length: 140 }).map(() => ({
+      x: Math.random() * w,
+      y: -20 - Math.random() * 100,
+      vx: -2 + Math.random() * 4,
+      vy: 2 + Math.random() * 3,
+      size: 4 + Math.random() * 6,
+      a: Math.random() * Math.PI,
+      vr: -0.1 + Math.random() * 0.2,
+      color: `hsl(${Math.floor(Math.random() * 360)}, 80%, 60%)`,
+    }));
+    let frame = 0;
+    const maxFrames = 220;
+    function draw() {
+      frame++;
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+      for (const p of pieces) {
+        p.x += p.vx; p.y += p.vy; p.a += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
+      }
+      if (frame < maxFrames) requestAnimationFrame(draw); else {
+        window.removeEventListener('resize', onResize);
+        canvas?.remove();
+      }
+    }
+    requestAnimationFrame(draw);
+  } catch { /* noop */ }
+}
+
+// ——————————————————————————————————————————————————————————
+// Props del componente unificado
+// ——————————————————————————————————————————————————————————
+interface RouletteUnifiedProps {
+  rewards?: Reward[]; // si no se pasa, usa DEFAULT_REWARDS_V1
+  onResult?: (reward: Reward, index: number) => void;
+  size?: number; // si no se define, se autoajusta al contenedor
+  fixedSectors?: number; // normalmente 7
+  durationMs?: number; // V1 ≈ 5200ms
+  disabled?: boolean;
+  debug?: boolean; // imprime tabla de ángulos y guía visual
+}
+
+// ——————————————————————————————————————————————————————————
+// Componente principal (geometría V2 + reglas V1)
+// ——————————————————————————————————————————————————————————
+const RouletteUnified: React.FC<RouletteUnifiedProps> = ({
+  rewards = DEFAULT_REWARDS_V1,
+  onResult,
+  size,
+  fixedSectors = 7,
+  durationMs = 5200,
+  disabled = false,
+  debug = false,
+}) => {
+  // Normalización exacta del número de sectores (estilo V2)
+  const data = useMemo<Reward[]>(() => {
+    const src = Array.isArray(rewards) && rewards.length > 0 ? rewards : DEFAULT_REWARDS_V1;
+    if (fixedSectors && fixedSectors > 0) {
+      const out: Reward[] = [];
+      for (let i = 0; i < fixedSectors; i++) out.push(src[i % src.length]);
+      return out;
+    }
+    return src;
+  }, [rewards, fixedSectors]);
+
+  const n = data.length;
+  const segment = 360 / n;
+
+  // Responsivo (si no hay size explícito)
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [autoSize, setAutoSize] = useState<number>(420);
+  useEffect(() => {
+    if (size) return; // si viene fijo no observar
+    const el = containerRef.current; if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const w = (e.contentBoxSize as any)?.[0]?.inlineSize || e.contentRect.width || el.clientWidth;
+        setAutoSize(clamp(Math.floor(w), 260, 560));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [size]);
+
+  const diameter = size ?? autoSize;
+  const radius = diameter / 2;
+
+  // Estado de animación (estilo V2)
+  const [rotation, setRotation] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const lastTarget = useRef(0);
+  
+  // Estado y estilos para el modo debug
+  const [showDebugOverlay, setShowDebugOverlay] = useState(debug);
+  
+  // Utilidades de depuración para visualizar la alineación de los sectores
+  useEffect(() => {
+    if (debug) {
+      console.log(`[RULETA DEBUG] ${n} sectores de ${segment}° cada uno`);
+      console.log(`[RULETA DEBUG] Premios configurados:`, data.map((r, i) => `${i}: ${r.name}`).join(', '));
+    }
+  }, [debug, n, segment, data]);
+
+  // En CSS conic-gradient 0deg ya apunta a las 12 en punto, así que OFFSET=0
+  const OFFSET = 0;
+  
+  // Configuración de alineación
+  const WHEEL_CONFIG = {
+    SECTOR_ORDER: "CLOCKWISE", // Los sectores se dibujan en CSS en sentido horario
+    ROTATION_DIR: "COUNTERCLOCKWISE", // La rueda gira en sentido antihorario (rotación negativa)
+    POINTER_POSITION: "TOP", // El puntero está arriba (0°)
+    STARTING_INDEX: 0, // El índice 0 comienza arriba (0°)
+    VERBOSE_DEBUG: debug // Activar logs detallados
+  };
+
+  // REDISEÑO DE GEOMETRÍA
+  // - Wheel: CSS conic-gradient dibuja sectores en sentido HORARIO desde 0deg (arriba)
+  // - Rotación: Giramos en sentido ANTIHORARIO (valores negativos de rotación)
+  // - Alineación: El índice 0 (Trident) debe quedar exactamente arriba (0°)
+  const wheelGradient = useMemo(() => {
+    const stops: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const color = data[i].color ?? `hsl(${(i * 360) / n}, 70%, 50%)`;
+      const start = i * segment;
+      const end = (i + 1) * segment;
+      stops.push(`${color} ${start}deg ${end}deg`);
+    }
+    return `conic-gradient(from 0deg, ${stops.join(', ')})`;
+  }, [n, segment, data]);
+
+  // Líneas divisorias - seguimos el mismo orden del gradiente
+  const dividers = useMemo(() => Array.from({ length: n }).map((_, i) => i * segment), [n, segment]);
+
+  // Ángulo objetivo para que el CENTRO del sector quede en el puntero (12h)
+  const getTargetRotation = (idx: number) => {
+    // CORREGIDO: El offset del 0.5 estaba causando el problema
+    // Puntero está arriba (0°) y queremos que apunte al centro del sector ganador
+    const thetaCenter = (idx * segment) + (segment / 2); // centro exacto del sector
+    
+    // Rotación necesaria para llevar el centro del premio al puntero (12h)
+    // Negativo porque giramos en sentido antihorario
+    const base = -thetaCenter;
+    
+    // Añadimos múltiples vueltas para efecto visual
+    const finalRotation = base - (360 * 3);
+    
+    // Debug para verificar alineación
+    console.log(`[WHEEL DEBUG] Premio: ${idx} (${data[idx]?.name}), Rotación: ${finalRotation}°`);
+    return finalRotation;
+  };
+
+  // Función debug para forzar un índice específico (QA)
+  const forceSpin = (forceIndex: number) => {
+    if (spinning || disabled) return;
+    if (forceIndex < 0 || forceIndex >= data.length) return;
+    
+    console.log(`[RULETA] Forzando premio con índice ${forceIndex}: ${data[forceIndex]?.name}`);
+    
+    setSpinning(true);
+    const target = getTargetRotation(forceIndex);
+    lastTarget.current = target;
+    setRotation(target);
+    
+    window.setTimeout(() => {
+      setSpinning(false);
+      // Efectos V1
+      try { if ('vibrate' in navigator) (navigator as any).vibrate?.(70); } catch {}
+      const reward = data[forceIndex];
+      if (reward.sparkle) launchConfetti();
+      
+      // Verificación visual similar a spin()
+      const finalRot = norm(target);
+      const pointerAngle = norm(-finalRot);
+      const sectorIndex = Math.floor(pointerAngle / segment);
+      const visualIndex = sectorIndex % n;
+      const visualReward = data[visualIndex];
+      
+      // Verificamos que coincidan
+      if (visualIndex !== forceIndex) {
+        console.error(`[RULETA ERROR] Forzado: Discrepancia entre índice forzado (${forceIndex}: ${reward.name}) y visual (${visualIndex}: ${visualReward?.name})`);
+      }
+      
+      // SIEMPRE usamos el premio visual como fuente de verdad
+      onResult?.(visualReward || reward, visualIndex);
+      
+      console.log(`[RULETA DEBUG] Forzado premio: ${reward.name} (índice ${forceIndex}) - Visual: ${visualReward?.name} (${visualIndex})`);
+    }, durationMs);
+  };
+
+  // Exponer forceSpin para depuración
+  React.useEffect(() => {
+    (window as any).__rouletteForceSpin = (idx: number) => forceSpin(idx);
+    return () => { delete (window as any).__rouletteForceSpin; };
+  }, [data, durationMs, spinning, disabled]);
+
+  // Spin usando la selección ponderada de V1
+  const spin = () => {
+    if (spinning || disabled) return;
+    
+    // Seleccionamos el premio mediante la función de peso
+    const { reward, index } = pickWeighted(data);
+    
+    // IMPORTANTE: Este índice es ahora el índice LOGICO del premio seleccionado
+    console.log(`[RULETA] Premio seleccionado: ${reward.name} (índice ${index})`);
+    
+    // Iniciamos la animación
+    setSpinning(true);
+    
+    // Calculamos la rotación necesaria para que el sector elegido quede bajo el puntero
+    const target = getTargetRotation(index);
+    lastTarget.current = target;
+    setRotation(target);
+
+    // Esperamos a que termine la animación
+    window.setTimeout(() => {
+      setSpinning(false);
+      
+      // Efectos cuando termina el giro
+      try { if ('vibrate' in navigator) (navigator as any).vibrate?.(70); } catch {}
+      if (reward.sparkle) launchConfetti();
+      
+      // Verificamos visualmente qué premio quedó bajo el puntero
+      const finalRot = norm(target);
+      const pointerAngle = norm(-finalRot);
+      const sectorIndex = Math.floor(pointerAngle / segment);
+      const visualIndex = sectorIndex % n;
+      
+      // IMPORTANTE: El premio visual debe coincidir con el premio lógico
+      const visualReward = data[visualIndex];
+      
+      // Verificamos que coincidan
+      if (visualIndex !== index) {
+        console.error(`[RULETA ERROR] Discrepancia entre premio lógico (${index}: ${reward.name}) y visual (${visualIndex}: ${visualReward?.name})`);
+      }
+      
+      // Reportamos el premio seleccionado (usando el premio VISUAL como fuente de verdad)
+      onResult?.(visualReward || reward, visualIndex);
+      
+      // Debug adicional
+      if ((window as any).__rouletteDebugHook) {
+        (window as any).__rouletteDebugHook({
+          expectedIndex: index,
+          visualIndex,
+          actualReward: reward,
+          pointerAngle,
+          segment,
+          rewardName: reward.name,
+          expectedName: data[index].name,
+          visualName: visualReward?.name,
+          finalRotation: finalRot
+        });
+      }
+    }, durationMs);
+  };
+
+  // Debug: tabla de ángulos visibles mejorada
+  useEffect(() => {
+    if (!debug) return;
+    
+    // Mostramos sectores con índices y ángulos
+    const sectorInfo = data.map((p, i) => ({
+      index: i,
+      name: p.name,
+      startAngle: norm(i * segment),
+      centerAngle: norm((i + 0.5) * segment),
+      endAngle: norm((i + 1) * segment),
+      color: p.color,
+      probability: p.probability || 0
+    }));
+    
+    console.log("=== RULETA: MAPA DE SECTORES ===");
+    console.table(sectorInfo);
+    
+    // Mostrar información de cómo calcular el premio visualmente
+    console.log("=== RULETA: GUÍA DE INTERPRETACIÓN ===");
+    console.log("1. El puntero está arriba (0°)");
+    console.log("2. La rueda gira en sentido ANTIHORARIO (rotación negativa)");
+    console.log("3. El índice 0 está inicialmente en la parte superior");
+    console.log("4. La rotación final determina qué premio queda bajo el puntero");
+    console.log("5. Para determinar el sector desde una rotación final:");
+    console.log("   - Normalizar la rotación: (rot % 360 + 360) % 360");
+    console.log("   - Calcular ángulo del puntero: norm(-rotación)");
+    console.log("   - Calcular sector: Math.floor(ángulo / segment)");
+    
+  }, [debug, data, segment]);
+
+  // Helpers de estilo
+  const px = (v: number) => `${v}px`;
+
+  return (
+    <div ref={containerRef} className="w-full flex flex-col items-center select-none" style={{ minHeight: px(diameter + 120) }}>
+      <div className="relative" style={{ width: px(diameter), height: px(diameter) }}>
+        {/* Controles de debug */}
+        {debug && (
+          <div className="absolute top-[-30px] left-0 flex items-center gap-2 z-30 bg-black/50 text-white px-2 py-1 rounded">
+            <button 
+              onClick={() => setShowDebugOverlay(!showDebugOverlay)}
+              className="px-2 py-1 bg-blue-500 rounded text-xs"
+            >
+              {showDebugOverlay ? "Ocultar Debug" : "Mostrar Debug"}
+            </button>
+            <span className="text-xs">Rotación: {Math.round(rotation)}°</span>
+          </div>
+        )}
+        
+        {/* Marcador superior (puntero hacia abajo) */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-[22%] z-20">
+          <div className="relative w-[30px] h-[45px] flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-[26px] h-[36px] drop-shadow-lg">
+              <path d="M12 22 L4 8 H20 Z" fill="#fb923c" />
+            </svg>
+            <div className="absolute top-[-6px] w-[10px] h-[10px] bg-[#fb923c] rounded-full" />
+          </div>
+        </div>
+
+        {/* Wrapper con OFFSET fijo a -90° (mueve el 0° del gradiente a 12 en punto) */}
+        <motion.div
+          className="absolute inset-0 rounded-full"
+        >
+          {/* Disco que gira */}
+          <motion.div
+            className="absolute inset-0 rounded-full border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+            style={{ background: wheelGradient, willChange: 'transform' }}
+            animate={{ rotate: rotation }}
+            transition={{ duration: durationMs / 1000, ease: [0.2, 0.8, 0.2, 1] }}
+          >
+            {/* Separadores precisos */}
+            {dividers.map((deg, i) => (
+              <div
+                key={`divider-${i}`}
+                className="absolute left-1/2 top-1/2"
+                style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)`, transformOrigin: '50% 50%' }}
+              >
+                <div
+                  className="absolute bg-white/90"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    width: '1.5px',
+                    height: px(radius * 0.92),
+                    transform: 'translate(-50%, -100%)',
+                    transformOrigin: 'center bottom',
+                  }}
+                />
+                
+                {/* Índices de sector visibles en modo debug */}
+                {debug && showDebugOverlay && (
+                  <div 
+                    className="absolute text-white bg-black/80 px-1 rounded-sm z-10"
+                    style={{
+                      left: '50%',
+                      top: '10%',
+                      transform: 'translate(-50%, 0)',
+                      fontSize: '10px',
+                    }}
+                  >
+                    {i}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Etiquetas radiales (con flip para lado izquierdo) */}
+            {data.map((reward, i) => {
+              // Invertimos el índice para mantener la consistencia visual-lógica
+              // Así el índice 0 queda arriba, igual que en el gradiente
+              const visualIndex = (n - i) % n;
+              const angleCenter = (visualIndex + 0.5) * segment;
+              const aFinal = norm(angleCenter); // para decidir flip ya en la escena final
+              const isFlipped = aFinal > 90 && aFinal < 270;
+
+              const labelRadius = radius * 0.68;
+              const segRad = (segment * Math.PI) / 180;
+              const maxWidth = Math.floor(2 * labelRadius * Math.sin(segRad / 2) * 0.82);
+
+              return (
+                <div
+                  key={`label-${i}`}
+                  className="absolute left-1/2 top-1/2"
+                  style={{ transform: `rotate(${angleCenter}deg) translate(${px(labelRadius)})`, transformOrigin: '0 0' }}
+                >
+                  <span
+                    className="block text-center text-[clamp(10px,1.7vw,18px)] font-semibold leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] break-words whitespace-normal"
+                    style={{
+                      width: px(maxWidth),
+                      transform: `translateX(-50%) rotate(${isFlipped ? 180 : 0}deg)`,
+                      color: reward.textColor || '#111',
+                    }}
+                  >
+                    {reward.name}
+                  </span>
+                </div>
+              );
+            })}
+          </motion.div>
+
+          {/* Centro / botón */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[28%] h-[28%] rounded-full bg-white/95 border border-white/70 shadow-[inset_0_2px_8px_rgba(0,0,0,0.1),0_8px_24px_rgba(0,0,0,0.2)] flex items-center justify-center">
+            <button
+              onClick={spin}
+              disabled={spinning || disabled}
+              className="px-5 py-2 rounded-full text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+              style={{ background: 'linear-gradient(180deg,#f59e0b,#ea580c)' }}
+            >
+              {spinning ? 'Girando…' : 'Girar'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Mensajería opcional (retry / sparkle) */}
+      <AnimatePresence>
+        {!spinning && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="mt-4 text-center text-sm text-white/90"
+          >
+            <div className="opacity-80">{`Probabilidades cargadas como en V1 (Chupetines ${Math.round((data.find(d=>d.name==='Chupetines')?.probability||0)*100)}%, Nuevo intento ${Math.round((data.find(d=>d.retry)?.probability||0)*100)}%).`}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {debug && (
+        <div className="mt-4 text-xs text-white/80 font-mono grid grid-cols-3 gap-x-4 gap-y-1">
+          {data.map((r, i) => (
+            <React.Fragment key={`dbg-${i}`}>
+              <div>#{i + 1} {r.name}</div>
+              <div>start: {Math.round(norm(i * segment))}°</div>
+              <div>end: {Math.round(norm((i + 1) * segment))}°</div>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RouletteUnified;
+
+// ——————————————————————————————————————————————————————————
+// Dev harness opcional (para pruebas locales)
+// ——————————————————————————————————————————————————————————
+export const RouletteUnifiedDev: React.FC = () => {
+  const [last, setLast] = useState<Reward | null>(null);
+  return (
+    <div className="w-full flex flex-col items-center gap-4 p-4">
+      <RouletteUnified debug onResult={(r)=>setLast(r)} />
+      <div className="text-white/90 text-sm">Último premio: <b>{last?.name ?? '(aún ninguno)'}</b></div>
+    </div>
+  );
+};
